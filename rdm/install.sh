@@ -121,7 +121,7 @@ function promptChoiceLaunchDocker()
 }
 
 # Define some variables
-SCRIPT_VERSION="v0.2.2"
+SCRIPT_VERSION="v0.2.4"
 COMPANY_ID=$1
 DOCKER_TOKEN=$2
 LAWS3_DIR="${HOME}/3lawsRoboticsInc"
@@ -315,19 +315,20 @@ fi
       INSTALL_DOCKER=$(promptYesNo)
       if [[ "$INSTALL_DOCKER" == 1 ]]; then
         {
+          cout "Installing docker..."
           $SUDO apt-get update &> /dev/null
-          $SUDO apt-get install -y ca-certificates tee gnupg &> /dev/null
-          cwarn "Installed 'ca-certificates', 'tee' and 'gnupg' on system!"
+          $SUDO apt-get install -y ca-certificates gpg &> /dev/null
+          cwarn "Installed 'ca-certificates', and 'gpg' on system!"
           $SUDO install -m 0755 -d /etc/apt/keyrings &> /dev/null
-          curl -fsSL https://download.docker.com/linux/ubuntu/gpg | $SUDO gpg --dearmor -o /etc/apt/keyrings/docker.gpg &> /dev/null
+          curl -fsSL https://download.docker.com/linux/ubuntu/gpg | $SUDO gpg --batch --yes --dearmor -o /etc/apt/keyrings/docker.gpg &> /dev/null
           $SUDO chmod a+r /etc/apt/keyrings/docker.gpg &> /dev/null
           echo \
             "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
             "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
             $SUDO tee /etc/apt/sources.list.d/docker.list &> /dev/null
 
-          $SUDO apt-get update
-          $SUDO apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+          $SUDO apt-get update &> /dev/null
+          $SUDO apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin &> /dev/null
 
           cout "Docker successfully installed!"
         } || {

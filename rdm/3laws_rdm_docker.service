@@ -10,7 +10,7 @@ Restart=on-failure
 RestartSec=10
 User=@USERID@
 Group=@GROUPID@
-ExecStart=docker run --rm --name 3laws_rdm @DOCKER_IMAGE_LINK@
+ExecStart=docker run --rm --name 3laws_rdm -v /etc/machine-id:/3laws_robotics/machine-id @DOCKER_IMAGE_LINK@
 KillSignal=SIGINT
 TimeoutSec=10
 

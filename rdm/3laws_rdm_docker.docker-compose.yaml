@@ -7,6 +7,7 @@ services:
       - /etc/machine-id:/3laws_robotics/machine-id
       - /proc/stat:/3laws_robotics/proc/stat
     restart: on-failure
+    stop_signal: SIGINT
   watchtower:
     container_name: 3laws_rdm_updater
     image: containrrr/watchtower
@@ -15,4 +16,4 @@ services:
       - @HOME@/.docker/config.json:/config.json
     command: 3laws_rdm --cleanup --schedule "0 * * * * *"
     labels:
-      com.centurylinklabs.watchtower.stop-signal: "SIGINT"
+      com.centurylinklabs.watchtower.stop-signal: SIGINT

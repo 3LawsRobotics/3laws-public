@@ -5,13 +5,14 @@ After=docker.service
 StartLimitIntervalSec=0
 
 [Service]
-Type=exec
+Type=simple
 Restart=on-failure
 RestartSec=10
 User=@USERID@
 Group=@GROUPID@
-ExecStart=docker run --rm --name 3laws_rdm -v /etc/machine-id:/3laws_robotics/machine-id -v /proc/stat:/3laws_robotics/proc/stat @DOCKER_IMAGE_LINK@
-KillSignal=SIGINT
+ExecStartPre=docker compose -f @DOCKER_COMPOSE_LINK@ down
+ExecStart=docker compose -f @DOCKER_COMPOSE_LINK@ up
+ExecStop=docker compose -f @DOCKER_COMPOSE_LINK@ down
 TimeoutSec=10
 
 [Install]

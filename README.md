@@ -4,3 +4,8 @@
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/3LawsRobotics/3laws-public/master/rdm/install.sh) <COMPANY_ID> [<DOCKER_TOKEN>]
 ```
+
+## Robot diagnostic module uninstall:
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/3LawsRobotics/3laws-public/master/rdm/uninstall.sh)
+```

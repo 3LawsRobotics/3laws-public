@@ -1,0 +1,18 @@
+version: "3"
+services:
+  3laws_rdm:
+    container_name: 3laws_rdm
+    image: @DOCKER_IMAGE_LINK@
+    volumes:
+      - /etc/machine-id:/3laws_robotics/machine-id
+      - /proc/stat:/3laws_robotics/proc/stat
+    restart: on-failure
+  watchtower:
+    container_name: 3laws_rdm_updater
+    image: containrrr/watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - @HOME@/.docker/config.json:/config.json
+    command: 3laws_rdm --cleanup --schedule "0 * * * * *"
+    labels:
+      com.centurylinklabs.watchtower.stop-signal: "SIGINT"

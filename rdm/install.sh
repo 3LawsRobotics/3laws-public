@@ -5,6 +5,7 @@ NC='\033[0m'       # Text Reset
 On_Black='\033[40m'       # Black background
 On_Purple='\033[45m'      # Purple background
 On_Cyan='\033[46m'        # Cyan background
+On_Green='\033[42m'       # Green background
 BIRed='\033[1;91m'        # Bold Intense Red
 BWhite='\033[1;37m'       # Bold White
 BIYellow='\033[1;93m'     # Bold Intense Yellow
@@ -17,6 +18,7 @@ ColPrompt=${BWhite}${On_Cyan}
 ColInfo=${White}${On_Purple}
 ColWarn=${BIYellow}${On_Black}
 
+# Printing utilities
 function cout()
 {
   echo -e "${ColInfo}${1}${NC}"
@@ -36,32 +38,53 @@ function cwarn()
   echo -e "${ColWarn}${1}${NC}"
 }
 
+# Local functions
 function promptYesNo()
 {
-  local REPLY=0
-  select yn in Yes No; do
+  local REPLY=${2}
+  local TXT="[y/n]"
+
+  if [[ "$REPLY" == 1 ]]; then
+    TXT="[Y/n]"
+  elif [[ "$REPLY" == 0 ]]; then
+    TXT="[y/N]"
+  else
+    REPLY=""
+  fi
+
+  while true; do
+    local color=$'\033[1;37m\033[46m'
+    local noColor=$'\033[0m'
+    read -e -p "${color}${1} ${TXT}?${noColor} " yn
+
     case $yn in
-      Yes)
+      y|Y|Yes|yes|YES)
         REPLY=1
         break
       ;;
-      No)
+      n|N|No|no|NO)
         REPLY=0
         break
       ;;
-      *)
+      "")
+        if [ ! -z $REPLY ]; then
+          break
+        fi
+      ;;
+      * )
       ;;
     esac
   done
+
   echo "$REPLY"
 }
 
 function promptChoiceInstall()
 {
   local REPLY=""
-  select which in "Docker image" "ROS package"; do
+  select which in "Docker container" "ROS package"; do
     case $which in
-      "Docker image")
+      "Docker container")
         REPLY="DOCKER"
         break
       ;;
@@ -79,9 +102,9 @@ function promptChoiceInstall()
 function promptChoiceLaunchPackage()
 {
   local REPLY=""
-  select which in "Daemon" "Launchfile" "Manual"; do
+  select which in "Automatic" "Launchfile" "Manual"; do
     case $which in
-      "Daemon")
+      "Automatic")
         REPLY="DAEMON"
         break
       ;;
@@ -103,9 +126,9 @@ function promptChoiceLaunchPackage()
 function promptChoiceLaunchDocker()
 {
   local REPLY=""
-  select which in "Daemon" "Manual"; do
+  select which in "Automatic" "Manual"; do
     case $which in
-      "Daemon")
+      "Automatic")
         REPLY="DAEMON"
         break
       ;;
@@ -121,7 +144,7 @@ function promptChoiceLaunchDocker()
 }
 
 # Define some variables
-SCRIPT_VERSION="v0.2.4"
+SCRIPT_VERSION="v0.3.0"
 COMPANY_ID=$1
 DOCKER_TOKEN=$2
 LAWS3_DIR="${HOME}/3lawsRoboticsInc"
@@ -147,7 +170,7 @@ fi
 
 # Create 3laws directory
 {
-  mkdir -p $LAWS3_DIR
+  mkdir -p $LAWS3_DIR/scripts
 } || {
   cerr "Cannot create `${LAWS3_DIR}` directory, make sure you have write access to your home folder!"
   exit -1
@@ -171,49 +194,26 @@ fi
   # Package install mode
     cout "Install diagnostic module as a package..."
 
-    # Check if already cloned
-    CLONE=1
-    if [ -d "${PACKAGE_DIR}" ]; then
-      cin "It seems that the diagnostic module is already install do you want to overwrite it:"
-      CLONE=$(promptYesNo)
-      if [[ "$CLONE" == 1 ]]; then
-        {
-          rm -rf $PACKAGE_DIR
-        } || {
-          cerr "Failed to delete `${PACKAGE_DIR}` directory. Make sure you have correct write access to this directory!"
-          exit -1
-        }
-      fi
-    fi
-
-    # Clonw repo
-    if [[ "$CLONE" == 1 ]]; then
-      cout "Cloning 3laws repo..."
-      {
-        git clone "git@github.com:3LawsRobotics/${PACKAGE_DIR}.git" &> /dev/null
-      } || {
-        cerr "Failed to clone github repo. Make sure you have setup your ssh keys properly and have been given access to the 3laws repo!"
-        exit -1
-      }
-    fi
-
     # Install dependencies
     STDLIB=libstdc++-11-dev
     STDLIB_INSTALLED=0
     dpkg -l $STDLIB &> /dev/null && STDLIB_INSTALLED=1
     SED_INSTALLED=0
     dpkg -l sed &> /dev/null && SED_INSTALLED=1
-    if [[ "$STDLIB_INSTALLED" == 0 || "$SED_INSTALLED" == 0 ]]; then
+    CRON_INSTALLED=0
+    dpkg -l cron &> /dev/null && CRON_INSTALLED=1
+    GIT_INSTALLED=0
+    dpkg -l git &> /dev/null && GIT_INSTALLED=1
+    if [[ "$STDLIB_INSTALLED" == 0 || "$SED_INSTALLED" == 0  || "$CRON_INSTALLED" == 0  || "$GIT_INSTALLED" == 0 ]]; then
       cout "Installing dependencies..."
+      $SUDO apt-get update &> /dev/null
     fi
 
     if [[ "$STDLIB_INSTALLED" == 0 ]]; then
       {
         {
-          $SUDO apt-get update &> /dev/null
-          $SUDO apt-get install ${STDLIB} &> /dev/null
+          $SUDO apt-get install -y ${STDLIB} &> /dev/null
         } || {
-          $SUDO apt-get update &> /dev/null
           $SUDO apt-get install -y --no-install-recommends software-properties-common &> /dev/null
           $SUDO add-apt-repository -y "ppa:ubuntu-toolchain-r/test" &> /dev/null
           cwarn "Added 'ppa:ubuntu-toolchain-r/test' to apt sources!"
@@ -228,11 +228,55 @@ fi
 
     if [[ "$SED_INSTALLED" == 0 ]]; then
       {
-        $SUDO apt-get update &> /dev/null
-        $SUDO apt-get install sed &> /dev/null
+        $SUDO apt-get install -y sed &> /dev/null
         cwarn "Installed 'sed' on system!"
       } || {
         cerr "Failed to install 'sed' dependency!"
+        exit -1
+      }
+    fi
+
+    if [[ "$CRON_INSTALLED" == 0 ]]; then
+      {
+        $SUDO apt-get install -y cron &> /dev/null
+        cwarn "Installed 'cron' on system!"
+      } || {
+        cerr "Failed to install 'cron' dependency!"
+        exit -1
+      }
+    fi
+
+    if [[ "$GIT_INSTALLED" == 0 ]]; then
+      {
+        $SUDO apt-get install -y git &> /dev/null
+        cwarn "Installed 'git' on system!"
+      } || {
+        cerr "Failed to install 'git' dependency!"
+        exit -1
+      }
+    fi
+
+    # Check if already cloned
+    CLONE=1
+    if [ -d "${PACKAGE_DIR}" ]; then
+      CLONE=$(promptYesNo "It seems that the Diagnostic Module is already installed, do you want to overwrite it" 1)
+      if [[ "$CLONE" == 1 ]]; then
+        {
+          rm -rf $PACKAGE_DIR
+        } || {
+          cerr "Failed to delete `${PACKAGE_DIR}` directory. Make sure you have correct write access to this directory!"
+          exit -1
+        }
+      fi
+    fi
+
+    # Clone repo
+    if [[ "$CLONE" == 1 ]]; then
+      cout "Cloning 3laws repo..."
+      {
+        git clone "git@github.com:3LawsRobotics/${PACKAGE_DIR}.git" &> /dev/null
+      } || {
+        cerr "Failed to clone github repo. Make sure you have setup your ssh keys properly and have been given access to the 3laws repo!"
         exit -1
       }
     fi
@@ -243,6 +287,7 @@ fi
     if [[ "$LAUNCH_MODE" == "DAEMON" ]]; then
     (
       {
+        # Systemctl
         SRVNAME=3laws_rdm_ros2.service
         cout "Installing daemon..."
         cd $LAWS3_DIR/$PACKAGE_DIR/rdm
@@ -250,7 +295,23 @@ fi
           > $LAWS3_DIR/${SRVNAME}
         $SUDO mv -f $LAWS3_DIR/${SRVNAME} /etc/systemd/system/${SRVNAME} &> /dev/null
         $SUDO systemctl enable ${SRVNAME} &> /dev/null
-        $SUDO systemctl start ${SRVNAME} &> /dev/null
+        $SUDO systemctl restart ${SRVNAME} &> /dev/null
+
+        # Cron
+        cd $LAWS3_DIR/scripts
+        curl -fsSL "https://raw.githubusercontent.com/3LawsRobotics/3laws-public/master/rdm/update.sh" > update.sh
+        chmod +x update.sh
+
+        # Remove previous versions of job
+        cout "Adding cron update job..."
+        $SUDO crontab -l > crontmp
+        sed -i "/$3LAWS_RDM_UPDATE$/d" crontmp
+        LINE="0 * * * * ${LAWS3_DIR}/scripts/update.sh PACKAGE $(whoami) ${LAWS3_DIR} ${PACKAGE_DIR} ${SRVNAME} 2>&1 | /usr/bin/logger -t 3LAWS_RDM_UPDATE"
+        echo "${LINE}" >> crontmp
+        $SUDO crontab crontmp
+        $SUDO service cron reload &> /dev/null
+        rm crontmp
+
       } || {
         cerr "Failed to install daemon!"
         exit -1
@@ -307,12 +368,12 @@ fi
       exit -1
     fi
 
+    # Check docker installed
     {
       docker --version &> /dev/null
     } || {
       cerr "Docker not installed on your machine!"
-      cin "Do you want us to install docker for you?"
-      INSTALL_DOCKER=$(promptYesNo)
+      INSTALL_DOCKER=$(promptYesNo "Do you want us to install docker for you" 1)
       if [[ "$INSTALL_DOCKER" == 1 ]]; then
         {
           cout "Installing docker..."
@@ -340,9 +401,25 @@ fi
       fi
     }
 
+    # Check docker compose installed
+    {
+      docker compose version &> /dev/null
+    } || {
+      {
+        cout "Installing dependencies..."
+        $SUDO apt-get update &> /dev/null
+        $SUDO apt-get install -y docker-compose-plugin &> /dev/null
+        cwarn "Installed 'docker-compose-plugin' on system!"
+      } || {
+        cerr "Failed to install 'docker-compose-plugin' dependency!"
+        exit -1
+      }
+    }
+
     cout "Loging into docker registry..."
     {
-      echo $DOCKER_TOKEN | docker login ghcr.io -u 3lawscustomers --password-stdin &> /dev/null
+      echo 0
+      # echo $DOCKER_TOKEN | docker login ghcr.io -u 3lawscustomers --password-stdin &> /dev/null
     } || {
       cerr "Cannot log into docker registry. Is your access token correct?"
       exit -1
@@ -366,7 +443,8 @@ fi
         if [[ "$SED_INSTALLED" == 0 ]]; then
           {
             cout "Installing dependencies..."
-            $SUDO apt-get install sed &> /dev/null
+            $SUDO apt-get update &> /dev/null
+            $SUDO apt-get install -y sed &> /dev/null
             cwarn "Installed 'sed' on system!"
           } || {
             cerr "Failed to install 'sed' dependency!"
@@ -375,28 +453,36 @@ fi
         fi
 
         cout "Installing daemon..."
-        SRVNAME=3laws_rdm_docker.service
-        curl -fsSL "https://raw.githubusercontent.com/3LawsRobotics/3laws-public/master/rdm/${SRVNAME}" | \
-        sed "s+@DOCKER_IMAGE_LINK@+${DOCKER_IMAGE_LINK}+g; s+@USERID@+${USERID}+g; s+@GROUPID@+${GROUPID}+g" \
-          > $LAWS3_DIR/${SRVNAME}
-        $SUDO mv -f $LAWS3_DIR/${SRVNAME} /etc/systemd/system/${SRVNAME} &> /dev/null
-        $SUDO systemctl enable ${SRVNAME} &> /dev/null
-        $SUDO systemctl start ${SRVNAME} &> /dev/null
+        SRVNAME=3laws_rdm_docker
+        SRVNAME_FULL=${SRVNAME}.service
+        COMPOSENAME=${SRVNAME}.docker-compose.yaml
+        DOCKER_COMPOSE_LINK=$LAWS3_DIR/scripts/${COMPOSENAME}
+
+        curl -fsSL "https://raw.githubusercontent.com/3LawsRobotics/3laws-public/master/rdm/${COMPOSENAME}" | \
+          sed "s+@DOCKER_IMAGE_LINK@+${DOCKER_IMAGE_LINK}+g; s+@HOME@+${HOME}+g" > ${DOCKER_COMPOSE_LINK}
+
+        curl -fsSL "https://raw.githubusercontent.com/3LawsRobotics/3laws-public/master/rdm/${SRVNAME_FULL}" | \
+          sed "s+@DOCKER_COMPOSE_LINK@+${DOCKER_COMPOSE_LINK}+g; s+@USERID@+${USERID}+g; s+@GROUPID@+${GROUPID}+g" > \
+          $LAWS3_DIR/scripts/${SRVNAME_FULL}
+
+        $SUDO mv -f $LAWS3_DIR/scripts/${SRVNAME_FULL} /etc/systemd/system/${SRVNAME_FULL} &> /dev/null
+        $SUDO systemctl enable ${SRVNAME_FULL} &> /dev/null
+        $SUDO systemctl restart ${SRVNAME_FULL} &> /dev/null
       } || {
         cerr "Failed to install daemon!"
         exit -1
       }
       cout "Daemon installed successfully and activated on boot!"
       cout "To check the daemon status, run:"
-      echo -e "  $SUDO systemctl status ${SRVNAME}"
+      echo -e "  $SUDO systemctl status ${SRVNAME_FULL}"
       cout "To stop the daemon, run:"
-      echo -e "  $SUDO systemctl stop ${SRVNAME}"
+      echo -e "  $SUDO systemctl stop ${SRVNAME_FULL}"
       cout "To start the daemon, run:"
-      echo -e "  $SUDO systemctl start ${SRVNAME}"
+      echo -e "  $SUDO systemctl start ${SRVNAME_FULL}"
       cout "To deactivate the daemon on boot, run:"
-      echo -e "  $SUDO systemctl disable ${SRVNAME}"
+      echo -e "  $SUDO systemctl disable ${SRVNAME_FULL}"
       cout "To activate the daemon on boot, run:"
-      echo -e "  $SUDO systemctl enable ${SRVNAME}"
+      echo -e "  $SUDO systemctl enable ${SRVNAME_FULL}"
 
     else
       cout "In that case, run the following commands to start the docker container:"

@@ -24,30 +24,17 @@ set -e
 
 SCRIPT_VERSION="v0.3.0"
 MODE=$1
-CURRENT_USER=$2
-LAWS3_DIR=$3
-PACKAGE_DIR=$4
-SRVNAME=$5
+COMPANY_ID=$2
 
-# Check input arguments set
+# Check MODE set
 if [ -z "$MODE" ]; then
   cerr "MODE variable not defined!"
   exit -1
 fi
-if [ -z "$CURRENT_USER" ]; then
-  cerr "CURRENT_USER variable not defined!"
-  exit -1
-fi
-if [ -z "$LAWS3_DIR" ]; then
-  cerr "LAWS3_DIR variable not defined!"
-  exit -1
-fi
-if [ -z "$PACKAGE_DIR" ]; then
-  cerr "PACKAGE_DIR variable not defined!"
-  exit -1
-fi
-if [ -z "$SRVNAME" ]; then
-  cerr "SRVNAME variable not defined!"
+
+# Check COMPANY_ID set
+if [ -z "$COMPANY_ID" ]; then
+  cerr "COMPANY_ID variable not defined!"
   exit -1
 fi
 
@@ -60,74 +47,141 @@ if [[ "$(id -u)" == 0 ]]; then
   SUDO=""
 fi
 
-(
-  cd $LAWS3_DIR
 
-  if [[ "$MODE" == "PACKAGE" ]]; then
-    cout "Package update mode"
+if [[ "$MODE" == "PACKAGE" ]]; then
+  cout "Package update mode"
 
-    # Check if rdm installed
-    if [ ! -d "${PACKAGE_DIR}" ]; then
-        cerr "The Diagnostic Module doesn't seem to be installed"
-        exit -1
+  # Check input arguments set
+  CURRENT_USER=$3
+  if [ -z "$CURRENT_USER" ]; then
+    CURRENT_USER=$(whoami)
+  fi
+
+  LAWS3_DIR=$4
+  if [ -z "$LAWS3_DIR" ]; then
+    LAWS3_DIR="${HOME}/3lawsRoboticsInc"
+  fi
+
+  SRVNAME=$5
+  if [ -z "$SRVNAME" ]; then
+    SRVNAME=3laws_rdm_ros2.service
+  fi
+
+  # Check if rdm installed
+  PACKAGE_DIR="3laws_${COMPANY_ID}"
+  if [ ! -d "${LAWS3_DIR}/${PACKAGE_DIR}" ]; then
+      cerr "The Diagnostic Module doesn't seem to be installed"
+      exit -1
+  fi
+
+  (
+    cd $LAWS3_DIR/$PACKAGE_DIR
+
+    # Check if git repo has been modified
+    runuser -l "${CURRENT_USER}" -c "cd ${LAWS3_DIR}/${PACKAGE_DIR}; git fetch origin &> /dev/null"
+    DIRTY1=$(runuser -l "${CURRENT_USER}" -c "cd ${LAWS3_DIR}/${PACKAGE_DIR}; git merge-base --is-ancestor HEAD origin/master || echo 1")
+    DIRTY2=$(runuser -l "${CURRENT_USER}" -c "cd ${LAWS3_DIR}/${PACKAGE_DIR}; git status --porcelain")
+    if [[ -n "$DIRTY1" || -n "$DIRTY2" ]]; then
+      cerr "Changes detected to Diagnostic Module repo, updated aborted!"
+      exit -1
     fi
 
-    (
-      cd $PACKAGE_DIR
-      # Check if git repo has been modified
-      runuser -l "${CURRENT_USER}" -c "cd ${LAWS3_DIR}/${PACKAGE_DIR}; git fetch origin &> /dev/null"
-      DIRTY1=$(runuser -l "${CURRENT_USER}" -c "cd ${LAWS3_DIR}/${PACKAGE_DIR}; git merge-base --is-ancestor HEAD origin/master || echo 1")
-      DIRTY2=$(runuser -l "${CURRENT_USER}" -c "cd ${LAWS3_DIR}/${PACKAGE_DIR}; git status --porcelain")
-      if [[ -n "$DIRTY1" || -n "$DIRTY2" ]]; then
-        cerr "Changes detected to Diagnostic Module repo, updated aborted!"
-        exit -1
-      fi
+    # Check if need updating
+    UPDATE_AVAILABLE=$(runuser -l "${CURRENT_USER}" -c "cd ${LAWS3_DIR}/${PACKAGE_DIR}; git diff --quiet HEAD origin/master -- || echo 1")
+    if [[ -z "$UPDATE_AVAILABLE" ]]; then
+      cout "No update available."
+      exit 0
+    fi
+    cout "Update available, updating..."
 
-      # Check if need updating
-      UPDATE_AVAILABLE=$(runuser -l "${CURRENT_USER}" -c "cd ${LAWS3_DIR}/${PACKAGE_DIR}; git diff --quiet HEAD origin/master -- || echo 1")
-      if [[ -z "$UPDATE_AVAILABLE" ]]; then
-        cout "No update available."
-        exit 0
-      fi
-      cout "Update available, updating..."
-
-      # Check if service is running
-      SERVICE_ACTIVE=0
-      systemctl cat -- ${SRVNAME} &> /dev/null && SERVICE_ACTIVE=1
+    # Check if service is running
+    SERVICE_ACTIVE=0
+    systemctl cat -- ${SRVNAME} &> /dev/null && SERVICE_ACTIVE=1
+    if [[ "$SERVICE_ACTIVE" == 1 ]]; then
+      SERVICE_ACTIVE=1
+      systemctl is-active --quiet ${SRVNAME} || SERVICE_ACTIVE=0
       if [[ "$SERVICE_ACTIVE" == 1 ]]; then
-        SERVICE_ACTIVE=1
-        systemctl is-active --quiet ${SRVNAME} || SERVICE_ACTIVE=0
-        if [[ "$SERVICE_ACTIVE" == 1 ]]; then
-          cout "Stopping daemon..."
-          {
-            $SUDO systemctl stop ${SRVNAME} &> /dev/null
-          } || {
-            cwarn "Failed to stop Diagnostic Module service, you may have to restart it by hand!"
-          }
-        fi
-      fi
-
-      # Update
-      {
-        cout "Pulling repo..."
-        runuser -l "${CURRENT_USER}" -c "cd ${LAWS3_DIR}/${PACKAGE_DIR}; git pull &> /dev/null"
-      } || {
-        cerr "Failed to update repo!"
-        exit -1
-      }
-
-      # Restart service
-      if [[ "$SERVICE_ACTIVE" == 1 ]]; then
-        cout "Restarting daemon..."
+        cout "Stopping daemon..."
         {
-          $SUDO systemctl start ${SRVNAME} &> /dev/null
+          $SUDO systemctl stop ${SRVNAME} &> /dev/null
         } || {
-          cwarn "Failed to start Diagnostic Module service, you may have to start it by hand!"
+          cwarn "Failed to stop Diagnostic Module service, you may have to restart it by hand!"
         }
       fi
-    )
-  else
-    cout "Docker update mode"
+    fi
 
+    # Update
+    {
+      cout "Pulling repo..."
+      runuser -l "${CURRENT_USER}" -c "cd ${LAWS3_DIR}/${PACKAGE_DIR}; git pull &> /dev/null"
+    } || {
+      cerr "Failed to update repo!"
+      exit -1
+    }
+
+    # Restart service
+    if [[ "$SERVICE_ACTIVE" == 1 ]]; then
+      cout "Restarting daemon..."
+      {
+        $SUDO systemctl start ${SRVNAME} &> /dev/null
+      } || {
+        cwarn "Failed to start Diagnostic Module service, you may have to start it by hand!"
+      }
+    fi
+
+  )
+elif [[ "$MODE" == "DOCKER" ]]; then
+  cout "Docker update mode"
+
+  DOCKER_CONFIG="--config ${HOME}/.docker/3laws"
+
+  DOCKER_IMAGE_LINK=$3
+  if [ -z "$DOCKER_IMAGE_LINK" ]; then
+    DOCKER_REGISTRY=ghcr.io/3lawsrobotics
+    DOCKER_IMAGE_NAME="3laws_rdm_${COMPANY_ID}"
+    DOCKER_IMAGE_LINK="${DOCKER_REGISTRY}/${DOCKER_IMAGE_NAME}:latest"
   fi
-)
+
+  SRVNAME=$4
+  if [ -z "$SRVNAME" ]; then
+    SRVNAME=3laws_rdm_docker.service
+  fi
+
+  # Check if service is running
+  SERVICE_ACTIVE=0
+  systemctl cat -- ${SRVNAME} &> /dev/null && SERVICE_ACTIVE=1
+  if [[ "$SERVICE_ACTIVE" == 1 ]]; then
+    SERVICE_ACTIVE=1
+    systemctl is-active --quiet ${SRVNAME} || SERVICE_ACTIVE=0
+    if [[ "$SERVICE_ACTIVE" == 1 ]]; then
+      cout "Stopping daemon..."
+      {
+        $SUDO systemctl stop ${SRVNAME} &> /dev/null
+      } || {
+        cwarn "Failed to stop Diagnostic Module service, you may have to restart it by hand!"
+      }
+    fi
+  fi
+
+  # Update
+  cout "Pulling docker image..."
+  {
+    docker ${DOCKER_CONFIG} pull $DOCKER_IMAGE_LINK
+  } || {
+    cwarn "Failed to pull docker image!"
+  }
+
+  # Restart service
+  if [[ "$SERVICE_ACTIVE" == 1 ]]; then
+    cout "Restarting daemon..."
+    {
+      $SUDO systemctl start ${SRVNAME} &> /dev/null
+    } || {
+      cwarn "Failed to start Diagnostic Module service, you may have to start it by hand!"
+    }
+  fi
+
+else
+  cerr "Unkown update mode, should be one of : [PACKAGE, DOCKER]"
+  exit -1
+fi

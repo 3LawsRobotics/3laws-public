@@ -152,6 +152,7 @@ PACKAGE_DIR="3laws_${COMPANY_ID}"
 DOCKER_REGISTRY=ghcr.io/3lawsrobotics
 DOCKER_IMAGE_NAME="3laws_rdm_${COMPANY_ID}"
 DOCKER_IMAGE_LINK="${DOCKER_REGISTRY}/${DOCKER_IMAGE_NAME}:latest"
+DOCKER_CONFIG="--config ${HOME}/.docker/3laws"
 USERID=$(id -u)
 GROUPID=$(id -g)
 
@@ -306,7 +307,7 @@ fi
         cout "Adding cron update job..."
         $SUDO crontab -l > crontmp
         sed -i "/$3LAWS_RDM_UPDATE$/d" crontmp
-        LINE="0 * * * * ${LAWS3_DIR}/scripts/update.sh PACKAGE $(whoami) ${LAWS3_DIR} ${PACKAGE_DIR} ${SRVNAME} 2>&1 | /usr/bin/logger -t 3LAWS_RDM_UPDATE"
+        LINE="0 * * * * ${LAWS3_DIR}/scripts/update.sh PACKAGE ${COMPANY_ID} $(whoami) ${LAWS3_DIR} ${PACKAGE_DIR} ${SRVNAME} 2>&1 | /usr/bin/logger -t 3LAWS_RDM_UPDATE"
         echo "${LINE}" >> crontmp
         $SUDO crontab crontmp
         $SUDO service cron reload &> /dev/null
@@ -418,8 +419,7 @@ fi
 
     cout "Loging into docker registry..."
     {
-      echo 0
-      # echo $DOCKER_TOKEN | docker login ghcr.io -u 3lawscustomers --password-stdin &> /dev/null
+      echo $DOCKER_TOKEN | docker ${DOCKER_CONFIG} login ${DOCKER_REGISTRY} -u 3lawscustomers --password-stdin &> /dev/null
     } || {
       cerr "Cannot log into docker registry. Is your access token correct?"
       exit -1
@@ -427,7 +427,7 @@ fi
 
     cout "Pulling docker image..."
     {
-      docker pull $DOCKER_IMAGE_LINK
+      docker ${DOCKER_CONFIG} pull $DOCKER_IMAGE_LINK
     } || {
       cerr "Failed to pull docker image!"
       exit -1

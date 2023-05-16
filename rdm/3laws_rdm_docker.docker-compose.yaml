@@ -13,7 +13,7 @@ services:
     image: containrrr/watchtower
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - @HOME@/.docker/config.json:/config.json
+      - @HOME@/.docker/3laws/config.json:/config.json
     command: 3laws_rdm --cleanup --schedule "0 * * * * *"
     labels:
       com.centurylinklabs.watchtower.stop-signal: SIGINT

@@ -359,7 +359,7 @@ fi
       echo -e "  ros2 launch lll_rdm rdm.launch.py "
     fi
 
-  else
+  elif [[ "$LAUNCH_MODE" == "DOCKER" ]]; then
   # Docker install mode
     cout "Install diagnostic module as a docker container..."
 
@@ -486,10 +486,12 @@ fi
 
     else
       cout "In that case, run the following commands to start the docker container:"
-      echo -e "docker run -it --rm --name 3laws_rdm -v /etc/machine-id:/3laws_robotics/machine-id -v /proc/stat:/3laws_robotics/proc/stat $DOCKER_IMAGE_LINK"
+      echo -e "docker run -it --rm --name 3laws_rdm --pid=host -v /etc/machine-id:/3laws_robotics/machine-id $DOCKER_IMAGE_LINK"
       cout "If you want to run the container in detached mode:"
-      echo -e "docker run -d --rm --name 3laws_rdm -v /etc/machine-id:/3laws_robotics/machine-id -v /proc/stat:/3laws_robotics/proc/stat $DOCKER_IMAGE_LINK"
+      echo -e "docker run -d --rm --name 3laws_rdm --pid=host  -v /etc/machine-id:/3laws_robotics/machine-id $DOCKER_IMAGE_LINK"
     fi
-
+  else
+    cerr "Unkown update mode, should be one of : [PACKAGE, DOCKER]"
+    exit -1
   fi
 )

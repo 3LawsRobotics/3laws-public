@@ -22,7 +22,7 @@ function cwarn()
 # Exit on errors
 set -e
 
-SCRIPT_VERSION="v0.3.0"
+SCRIPT_VERSION="v0.3.1"
 MODE=$1
 COMPANY_ID=$2
 
@@ -78,16 +78,32 @@ if [[ "$MODE" == "PACKAGE" ]]; then
     cd $LAWS3_DIR/$PACKAGE_DIR
 
     # Check if git repo has been modified
-    runuser -l "${CURRENT_USER}" -c "cd ${LAWS3_DIR}/${PACKAGE_DIR}; git fetch origin &> /dev/null"
-    DIRTY1=$(runuser -l "${CURRENT_USER}" -c "cd ${LAWS3_DIR}/${PACKAGE_DIR}; git merge-base --is-ancestor HEAD origin/master || echo 1")
-    DIRTY2=$(runuser -l "${CURRENT_USER}" -c "cd ${LAWS3_DIR}/${PACKAGE_DIR}; git status --porcelain")
+    CMD1="cd ${LAWS3_DIR}/${PACKAGE_DIR}; git fetch origin &> /dev/null"
+    CMD2="cd ${LAWS3_DIR}/${PACKAGE_DIR}; git merge-base --is-ancestor HEAD origin/master || echo 1"
+    CMD3="cd ${LAWS3_DIR}/${PACKAGE_DIR}; git status --porcelain"
+    if [ -z "${SUDO}" ]; then
+      runuser -l "${CURRENT_USER}" -c "${CMD1}"
+      DIRTY1=$(runuser -l "${CURRENT_USER}" -c "${CMD2}")
+      DIRTY2=$(runuser -l "${CURRENT_USER}" -c "${CMD3}")
+    else
+      eval $CMD1
+      DIRTY1=$(eval $CMD2)
+      DIRTY2=$(eval $CMD3)
+    fi
+
     if [[ -n "$DIRTY1" || -n "$DIRTY2" ]]; then
       cerr "Changes detected to Diagnostic Module repo, updated aborted!"
       exit -1
     fi
 
     # Check if need updating
-    UPDATE_AVAILABLE=$(runuser -l "${CURRENT_USER}" -c "cd ${LAWS3_DIR}/${PACKAGE_DIR}; git diff --quiet HEAD origin/master -- || echo 1")
+    CMD="cd ${LAWS3_DIR}/${PACKAGE_DIR}; git diff --quiet HEAD origin/master -- || echo 1"
+    if [ -z "${SUDO}" ]; then
+      UPDATE_AVAILABLE=$(runuser -l "${CURRENT_USER}" -c "${CMD}")
+    else
+      UPDATE_AVAILABLE=$(eval $CMD)
+    fi
+
     if [[ -z "$UPDATE_AVAILABLE" ]]; then
       cout "No update available."
       exit 0
@@ -113,7 +129,12 @@ if [[ "$MODE" == "PACKAGE" ]]; then
     # Update
     {
       cout "Pulling repo..."
-      runuser -l "${CURRENT_USER}" -c "cd ${LAWS3_DIR}/${PACKAGE_DIR}; git pull &> /dev/null"
+      CMD="cd ${LAWS3_DIR}/${PACKAGE_DIR}; git pull &> /dev/null"
+      if [ -z "${SUDO}" ]; then
+        runuser -l "${CURRENT_USER}" -c "${CMD}"
+      else
+        eval $CMD
+      fi
     } || {
       cerr "Failed to update repo!"
       exit -1
@@ -128,7 +149,6 @@ if [[ "$MODE" == "PACKAGE" ]]; then
         cwarn "Failed to start Diagnostic Module service, you may have to start it by hand!"
       }
     fi
-
   )
 elif [[ "$MODE" == "DOCKER" ]]; then
   cout "Docker update mode"
@@ -185,3 +205,6 @@ else
   cerr "Unkown update mode, should be one of : [PACKAGE, DOCKER]"
   exit -1
 fi
+
+cout "Update completed!"
+exit 0

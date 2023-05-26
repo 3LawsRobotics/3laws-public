@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+SCRIPT_VERSION="v0.3.1"
 
 # Colors
 NC='\033[0m'       # Text Reset
@@ -77,7 +78,6 @@ function promptYesNo()
   echo "$REPLY"
 }
 
-SCRIPT_VERSION="v0.3.0"
 LAWS3_DIR="${HOME}/3lawsRoboticsInc"
 
 # Exit on errors

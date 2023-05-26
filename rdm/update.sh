@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+SCRIPT_VERSION="v0.3.2"
 
 function cout()
 {
@@ -22,7 +23,6 @@ function cwarn()
 # Exit on errors
 set -e
 
-SCRIPT_VERSION="v0.3.1"
 MODE=$1
 COMPANY_ID=$2
 

@@ -144,7 +144,7 @@ function promptChoiceLaunchDocker()
 }
 
 # Define some variables
-SCRIPT_VERSION="v0.3.1"
+SCRIPT_VERSION="v0.3.2"
 COMPANY_ID=$1
 DOCKER_TOKEN=$2
 LAWS3_DIR="${HOME}/3lawsRoboticsInc"
@@ -363,7 +363,7 @@ fi
       echo -e "  ros2 launch lll_rdm rdm.launch.py"
     fi
 
-  elif [[ "$LAUNCH_MODE" == "DOCKER" ]]; then
+  elif [[ "$INSTALL_MODE" == "DOCKER" ]]; then
   # Docker install mode
     cout "Install diagnostic module as a docker container..."
 

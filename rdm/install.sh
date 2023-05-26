@@ -144,7 +144,7 @@ function promptChoiceLaunchDocker()
 }
 
 # Define some variables
-SCRIPT_VERSION="v0.3.0"
+SCRIPT_VERSION="v0.3.1"
 COMPANY_ID=$1
 DOCKER_TOKEN=$2
 LAWS3_DIR="${HOME}/3lawsRoboticsInc"
@@ -329,8 +329,7 @@ fi
     )
     elif [[ "$LAUNCH_MODE" == "LAUNCHFILE" ]]; then
       cout "In that case, please add the following line to your .bashrc:"
-      echo -e "  export LD_LIBRARY_PATH=${PWD}/${PACKAGE_DIR}/rdm/backend_lib/lib:\$LD_LIBRARY_PATH"
-      echo -e "  source ${PWD}/${PACKAGE_DIR}/rdm/ros_packages/local_setup.bash"
+      echo -e "  source ${PWD}/${PACKAGE_DIR}/rdm/ROS2/local_setup.bash"
       cout "Source your bashrc :"
       echo -e "  source ~/.bashrc"
       cout "Add the following action to the LaunchDescription in your launch file:"
@@ -338,25 +337,30 @@ fi
       echo -e "  from launch.launch_description_sources import PythonLaunchDescriptionSource"
       echo -e "  from launch.substitutions import PathJoinSubstitution"
       echo -e " "
-      echo -e "  PythonLaunchDescriptionSource("
-      echo -e "      PathJoinSubstitution("
-      echo -e "          ["
-      echo -e "              get_package_share_directory('lll_rdm'),"
-      echo -e "              'launch',"
-      echo -e "              'rdm.launch.py',"
-      echo -e "          ]"
-      echo -e "      )"
+      echo -e "  IncludeLaunchDescription("
+      echo -e "      PythonLaunchDescriptionSource("
+      echo -e "          PathJoinSubstitution("
+      echo -e "              ["
+      echo -e "                  get_package_share_directory('lll_rdm'),"
+      echo -e "                  'launch',"
+      echo -e "                  'rdm.launch.py',"
+      echo -e "              ]"
+      echo -e "          )"
+      echo -e "      ),"
+      echo -e "      launch_arguments={"
+      echo -e "          'log_stdout_disabled': 'true',"
+      echo -e "      }.items(),"
       echo -e "  )"
+      echo -e " "
 
 
     else # Manual
       cout "In that case, please add the following line to your .bashrc:"
-      echo -e "  export LD_LIBRARY_PATH=${PWD}/${PACKAGE_DIR}/rdm/backend/lib:\$LD_LIBRARY_PATH"
       echo -e "  source ${PWD}/${PACKAGE_DIR}/rdm/ROS2/local_setup.bash"
       cout "Source your bashrc :"
       echo -e "  source ~/.bashrc"
       cout "Launch diagnostic module:"
-      echo -e "  ros2 launch lll_rdm rdm.launch.py "
+      echo -e "  ros2 launch lll_rdm rdm.launch.py"
     fi
 
   elif [[ "$LAUNCH_MODE" == "DOCKER" ]]; then

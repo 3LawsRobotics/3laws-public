@@ -5,9 +5,12 @@ services:
     image: @DOCKER_IMAGE_LINK@
     volumes:
       - /etc/machine-id:/3laws_robotics/machine-id
+      - /dev/shm:/dev/shm
     restart: on-failure
     stop_signal: SIGINT
     pid: host
+    network_mode: host
+    user: @USERID@:@GROUPID@
   watchtower:
     container_name: 3laws_rdm_updater
     image: containrrr/watchtower

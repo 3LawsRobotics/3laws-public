@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-SCRIPT_VERSION="v0.4.1"
+SCRIPT_VERSION="v0.4.2"
 
 # Exit on errors
 set -e
@@ -495,7 +495,7 @@ elif [[ "$INSTALL_MODE" == "docker" ]]; then
       DOCKER_COMPOSE_LINK=$LAWS3_DIR/scripts/${COMPOSENAME}
 
       curl -fsSL "https://raw.githubusercontent.com/3LawsRobotics/3laws-public/master/rdm/${COMPOSENAME}" | \
-        sed "s+@DOCKER_IMAGE_LINK@+${DOCKER_IMAGE_LINK}+g; s+@HOME@+${HOME}+g" > ${DOCKER_COMPOSE_LINK}
+        sed "s+@DOCKER_IMAGE_LINK@+${DOCKER_IMAGE_LINK}+g; s+@HOME@+${HOME}+g; s+@USERID@+${USERID}+g; s+@GROUPID@+${GROUPID}+g" > ${DOCKER_COMPOSE_LINK}
 
       curl -fsSL "https://raw.githubusercontent.com/3LawsRobotics/3laws-public/master/rdm/${SRVNAME_FULL}" | \
         sed "s+@DOCKER_COMPOSE_LINK@+${DOCKER_COMPOSE_LINK}+g; s+@USERID@+${USERID}+g; s+@GROUPID@+${GROUPID}+g" > \
@@ -522,9 +522,9 @@ elif [[ "$INSTALL_MODE" == "docker" ]]; then
 
   else
     cout "In that case, run the following commands to start the docker container:"
-    echo -e "docker run -it --rm --name 3laws_rdm --pid=host -v /etc/machine-id:/3laws_robotics/machine-id $DOCKER_IMAGE_LINK"
+    echo -e "docker run -it --rm --name 3laws_rdm -u ${USERID}:${GROUPID} --net=host --pid=host -v /dev/shm:/dev/shm -v /etc/machine-id:/3laws_robotics/machine-id $DOCKER_IMAGE_LINK"
     cout "If you want to run the container in detached mode:"
-    echo -e "docker run -d --rm --name 3laws_rdm --pid=host  -v /etc/machine-id:/3laws_robotics/machine-id $DOCKER_IMAGE_LINK"
+    echo -e "docker run -d --rm --name 3laws_rdm -u ${USERID}:${GROUPID} --net=host --pid=host  -v /dev/shm:/dev/shm -v /etc/machine-id:/3laws_robotics/machine-id $DOCKER_IMAGE_LINK"
   fi
 else
   cerr "Unkown update mode, should be one of : [PACKAGE, DOCKER]"

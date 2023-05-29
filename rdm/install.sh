@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-SCRIPT_VERSION="v0.4.2"
+SCRIPT_VERSION="v0.5.0"
 
 # Exit on errors
 set -e
@@ -135,7 +135,7 @@ Usage: ${0##*/} [-h] [-y] [-i package|docker] [-s auto|manual] [-t <DOCKER_TOKEN
 Install 3Laws Robot Diagnostic Module
    -h                 show this help menu
    -y                 answer yes to all yes/no questions
-   -m package|docker  install mode
+   -i package|docker  install mode
    -s auto|manual     start mode
    -t <DOCKER_TOKEN>  docker api token
 If -i or -s are not specified, you will be prompted during the installation
@@ -183,6 +183,7 @@ fi
 # Define some variables
 COMPANY_ID=$1
 LAWS3_DIR="${HOME}/3lawsRoboticsInc"
+SCRIPT_DIR="${LAWS3_DIR}/scripts"
 PACKAGE_DIR="3laws_${COMPANY_ID}"
 DOCKER_REGISTRY=ghcr.io/3lawsrobotics
 DOCKER_IMAGE_NAME="3laws_rdm_${COMPANY_ID}"
@@ -190,7 +191,9 @@ DOCKER_IMAGE_LINK="${DOCKER_REGISTRY}/${DOCKER_IMAGE_NAME}:latest"
 DOCKER_CONFIG="--config ${HOME}/.docker/3laws"
 USERID=$(id -u)
 GROUPID=$(id -g)
-
+BRANCH=master
+LOCAL_INSTALL=0
+CURRENT_SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 
 # Main
@@ -204,7 +207,7 @@ fi
 
 # Create 3laws directory
 {
-  mkdir -p $LAWS3_DIR/scripts
+  mkdir -p $SCRIPT_DIR
 } || {
   cerr "Cannot create `${LAWS3_DIR}` directory, make sure you have write access to your home folder!"
   exit -1
@@ -331,19 +334,16 @@ if [[ "$INSTALL_MODE" == "package" ]]; then
       sed "s+@LAWS3_WS@+$(pwd)+g; s+@ROS_DISTRO@+${ROS_DISTRO}+g; s+@USERID@+${USERID}+g; s+@GROUPID@+${GROUPID}+g" ${SRVNAME} \
         > $LAWS3_DIR/${SRVNAME}
       $SUDO mv -f $LAWS3_DIR/${SRVNAME} /etc/systemd/system/${SRVNAME} &> /dev/null
+      $SUDO systemctl daemon-reload
       $SUDO systemctl enable ${SRVNAME} &> /dev/null
       $SUDO systemctl restart ${SRVNAME} &> /dev/null
 
       # Cron
-      cd $LAWS3_DIR/scripts
-      curl -fsSL "https://raw.githubusercontent.com/3LawsRobotics/3laws-public/master/rdm/update.sh" > update.sh
-      chmod +x update.sh
-
-      # Remove previous versions of job
+      cd $SCRIPT_DIR
       cout "Adding cron update job..."
       $SUDO crontab -l > crontmp
-      sed -i "/$3LAWS_RDM_UPDATE$/d" crontmp
-      LINE="0 * * * * ${LAWS3_DIR}/scripts/update.sh PACKAGE ${COMPANY_ID} $(whoami) ${LAWS3_DIR} ${PACKAGE_DIR} ${SRVNAME} 2>&1 | /usr/bin/logger -t 3LAWS_RDM_UPDATE"
+      sed -i "/$3LAWS_RDM_UPDATE_PACKAGE'$/d" crontmp # Remove previous versions of job
+      LINE="0 * * * * bash -c 'bash <(curl -fsSL https://raw.githubusercontent.com/3LawsRobotics/3laws-public/${BRANCH}/rdm/update.sh) PACKAGE ${COMPANY_ID} ${HOME} ${LAWS3_DIR} $(whoami) ${USERID} ${GROUPID} ${SRVNAME} ${ROS_DISTRO} 2>&1 | /usr/bin/logger -t 3LAWS_RDM_UPDATE_PACKAGE'"
       echo "${LINE}" >> crontmp
       $SUDO crontab crontmp
       $SUDO service cron reload &> /dev/null
@@ -460,7 +460,7 @@ elif [[ "$INSTALL_MODE" == "docker" ]]; then
 
   cout "Pulling docker image..."
   {
-    docker ${DOCKER_CONFIG} pull $DOCKER_IMAGE_LINK
+    eval docker $DOCKER_CONFIG pull $DOCKER_IMAGE_LINK
   } || {
     cerr "Failed to pull docker image!"
     exit -1
@@ -491,19 +491,42 @@ elif [[ "$INSTALL_MODE" == "docker" ]]; then
       cout "Installing daemon..."
       SRVNAME=3laws_rdm_docker
       SRVNAME_FULL=${SRVNAME}.service
-      COMPOSENAME=${SRVNAME}.docker-compose.yaml
-      DOCKER_COMPOSE_LINK=$LAWS3_DIR/scripts/${COMPOSENAME}
+      DOCKER_COMPOSE_NAME=${SRVNAME}.docker-compose.yaml
+      DOCKER_COMPOSE_PATH=${SCRIPT_DIR}/${DOCKER_COMPOSE_NAME}
 
-      curl -fsSL "https://raw.githubusercontent.com/3LawsRobotics/3laws-public/master/rdm/${COMPOSENAME}" | \
-        sed "s+@DOCKER_IMAGE_LINK@+${DOCKER_IMAGE_LINK}+g; s+@HOME@+${HOME}+g; s+@USERID@+${USERID}+g; s+@GROUPID@+${GROUPID}+g" > ${DOCKER_COMPOSE_LINK}
+      if [[ "${LOCAL_INSTALL}" == 1 ]]; then
+        cat "${CURRENT_SCRIPT_DIR}/${DOCKER_COMPOSE_NAME}" | \
+          sed "s+@DOCKER_IMAGE_LINK@+${DOCKER_IMAGE_LINK}+g; s+@HOME@+${HOME}+g; s+@USERID@+${USERID}+g; s+@GROUPID@+${GROUPID}+g" > ${DOCKER_COMPOSE_PATH}
 
-      curl -fsSL "https://raw.githubusercontent.com/3LawsRobotics/3laws-public/master/rdm/${SRVNAME_FULL}" | \
-        sed "s+@DOCKER_COMPOSE_LINK@+${DOCKER_COMPOSE_LINK}+g; s+@USERID@+${USERID}+g; s+@GROUPID@+${GROUPID}+g" > \
-        $LAWS3_DIR/scripts/${SRVNAME_FULL}
+        cat "${CURRENT_SCRIPT_DIR}/${SRVNAME_FULL}" | \
+          sed "s+@DOCKER_COMPOSE_PATH@+${DOCKER_COMPOSE_PATH}+g; s+@USERID@+${USERID}+g; s+@GROUPID@+${GROUPID}+g" > \
+          ${SCRIPT_DIR}/${SRVNAME_FULL}
 
-      $SUDO mv -f $LAWS3_DIR/scripts/${SRVNAME_FULL} /etc/systemd/system/${SRVNAME_FULL} &> /dev/null
+      else
+        curl -fsSL "https://raw.githubusercontent.com/3LawsRobotics/3laws-public/${BRANCH}/rdm/${DOCKER_COMPOSE_NAME}" | \
+          sed "s+@DOCKER_IMAGE_LINK@+${DOCKER_IMAGE_LINK}+g; s+@HOME@+${HOME}+g; s+@USERID@+${USERID}+g; s+@GROUPID@+${GROUPID}+g" > ${DOCKER_COMPOSE_PATH}
+
+        curl -fsSL "https://raw.githubusercontent.com/3LawsRobotics/3laws-public/${BRANCH}/rdm/${SRVNAME_FULL}" | \
+          sed "s+@DOCKER_COMPOSE_PATH@+${DOCKER_COMPOSE_PATH}+g; s+@USERID@+${USERID}+g; s+@GROUPID@+${GROUPID}+g" > \
+          ${SCRIPT_DIR}/${SRVNAME_FULL}
+      fi
+
+      $SUDO mv -f ${SCRIPT_DIR}/${SRVNAME_FULL} /etc/systemd/system/${SRVNAME_FULL} &> /dev/null
+      $SUDO systemctl daemon-reload
       $SUDO systemctl enable ${SRVNAME_FULL} &> /dev/null
       $SUDO systemctl restart ${SRVNAME_FULL} &> /dev/null
+
+      # Cron
+      cd $SCRIPT_DIR
+      cout "Adding cron update job..."
+      $SUDO crontab -l > crontmp
+      sed -i "/$3LAWS_RDM_UPDATE_DOCKER'$/d" crontmp # Remove previous versions of job
+      LINE="* * * * * bash -c 'bash <(curl -fsSL https://raw.githubusercontent.com/3LawsRobotics/3laws-public/${BRANCH}/rdm/update.sh) DOCKER ${COMPANY_ID} ${HOME} ${LAWS3_DIR} $(whoami) ${USERID} ${GROUPID} NO_PULL 2>&1 | /usr/bin/logger -t 3LAWS_RDM_UPDATE_DOCKER'"
+      echo "${LINE}" >> crontmp
+      $SUDO crontab crontmp
+      $SUDO service cron reload &> /dev/null
+      rm crontmp
+
     } || {
       cerr "Failed to install daemon!"
       exit -1

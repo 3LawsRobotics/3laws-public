@@ -521,7 +521,7 @@ elif [[ "$INSTALL_MODE" == "docker" ]]; then
       cout "Adding cron update job..."
       $SUDO crontab -l > crontmp
       sed -i "/$3LAWS_RDM_UPDATE_DOCKER'$/d" crontmp # Remove previous versions of job
-      LINE="* * * * * bash -c 'bash <(curl -fsSL https://raw.githubusercontent.com/3LawsRobotics/3laws-public/${BRANCH}/rdm/update.sh) DOCKER ${COMPANY_ID} ${HOME} ${LAWS3_DIR} $(whoami) ${USERID} ${GROUPID} NO_PULL 2>&1 | /usr/bin/logger -t 3LAWS_RDM_UPDATE_DOCKER'"
+      LINE="30 * * * * bash -c 'bash <(curl -fsSL https://raw.githubusercontent.com/3LawsRobotics/3laws-public/${BRANCH}/rdm/update.sh) DOCKER ${COMPANY_ID} ${HOME} ${LAWS3_DIR} $(whoami) ${USERID} ${GROUPID} NO_PULL 2>&1 | /usr/bin/logger -t 3LAWS_RDM_UPDATE_DOCKER'"
       echo "${LINE}" >> crontmp
       $SUDO crontab crontmp
       $SUDO service cron reload &> /dev/null

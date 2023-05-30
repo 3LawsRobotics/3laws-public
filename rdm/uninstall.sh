@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-SCRIPT_VERSION="v0.3.1"
+SCRIPT_VERSION="v0.3.2"
 
 # Colors
 NC='\033[0m'       # Text Reset
@@ -113,7 +113,7 @@ function remove_service()
       $SUDO systemctl disable ${SRVNAME} &> /dev/null
       $SUDO rm /etc/systemd/system/${SRVNAME}
     } || {
-      warn "Failed to remove `${SRVNAME}` daemon, sorry about that!"
+      warn "Failed to remove `${SRVNAME}` daemon, you may want to make sure there are not lingering services running!"
     }
   fi
 }
@@ -124,5 +124,14 @@ remove_service
 
 SRVNAME=3laws_rdm_docker.service
 remove_service
+
+# Remove cron jobs
+cd $SCRIPT_DIR
+{
+  $SUDO crontab -l | sed "/$3LAWS_RDM_UPDATE_PACKAGE'$/d" | sed "/$3LAWS_RDM_UPDATE_DOCKER'$/d" | $SUDO crontab
+  $SUDO service cron reload &> /dev/null
+} || {
+  warn "Failed to remove cron update jobs, you may want to check you cron jobs: $SUDO crontab -e"
+}
 
 cout "Uninstall successful!"

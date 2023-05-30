@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-SCRIPT_VERSION="v0.4.0"
+SCRIPT_VERSION="v0.4.1"
 
 function cout()
 {
@@ -32,6 +32,7 @@ LAWS3_DIR=$4
 CURRENT_USER=$5
 USERID=$6
 GROUPID=$7
+ROBOTID=$8
 
 # Check inputs set
 if [ -z "$MODE" ]; then
@@ -80,12 +81,12 @@ if [[ "$MODE" == "PACKAGE" ]]; then
   cout "Package update mode"
 
   # Check input arguments set
-  SRVNAME=$8
+  SRVNAME=$9
   if [ -z "$SRVNAME" ]; then
     SRVNAME=3laws_rdm_ros2.service
   fi
 
-  ROS_DISTRO_LOCAL=$9
+  ROS_DISTRO_LOCAL=${10}
   if [ -z "$ROS_DISTRO_LOCAL" ]; then
     ROS_DISTRO_LOCAL=$ROS_DISTRO
   fi
@@ -168,7 +169,7 @@ if [[ "$MODE" == "PACKAGE" ]]; then
     cout "Updating daemon..."
     {
       cd $LAWS3_DIR/$PACKAGE_DIR/rdm
-      sed "s+@LAWS3_WS@+$(pwd)+g; s+@ROS_DISTRO@+${ROS_DISTRO_LOCAL}+g; s+@USERID@+${USERID}+g; s+@GROUPID@+${GROUPID}+g" ${SRVNAME} \
+      sed "s+@LAWS3_WS@+$(pwd)+g; s+@ROS_DISTRO@+${ROS_DISTRO_LOCAL}+g; s+@USERID@+${USERID}+g; s+@GROUPID@+${GROUPID}+g; s+@LAWS3_ROBOT_ID@+${ROBOTID}+g" ${SRVNAME} \
         > $LAWS3_DIR/${SRVNAME}
       $SUDO mv -f $LAWS3_DIR/${SRVNAME} /etc/systemd/system/${SRVNAME} &> /dev/null
       $SUDO systemctl daemon-reload
@@ -201,7 +202,7 @@ elif [[ "$MODE" == "DOCKER" ]]; then
   DOCKER_CONFIG="--config ${HOME_LOCAL}/.docker/3laws"
 
   # Docker specific input arguments
-  NO_PULL=$8
+  NO_PULL=$9
 
   # Check if service is running
   SERVICE_EXISTS=0
@@ -235,7 +236,7 @@ elif [[ "$MODE" == "DOCKER" ]]; then
   NEED_COMPOSE_UPDATE=0
   if [[ -f  ${DOCKER_COMPOSE_PATH} ]]; then
     curl -fsSL "https://raw.githubusercontent.com/3LawsRobotics/3laws-public/${BRANCH}/rdm/${DOCKER_COMPOSE_NAME}" | \
-      sed "s+@DOCKER_IMAGE_LINK@+${DOCKER_IMAGE_LINK}+g; s+@HOME@+${HOME}+g; s+@USERID@+${USERID}+g; s+@GROUPID@+${GROUPID}+g" > ${DOCKER_COMPOSE_PATH}.new
+      sed "s+@DOCKER_IMAGE_LINK@+${DOCKER_IMAGE_LINK}+g; s+@HOME@+${HOME_LOCAL}+g; s+@USERID@+${USERID}+g; s+@GROUPID@+${GROUPID}+g; s+@LAWS3_ROBOT_ID@+${ROBOTID}+g" > ${DOCKER_COMPOSE_PATH}.new
     if [[ -f ${DOCKER_COMPOSE_PATH}.new ]]; then
       if [ -n "$(cat ${DOCKER_COMPOSE_PATH}.new)" ]; then
         cmp -s ${DOCKER_COMPOSE_PATH} ${DOCKER_COMPOSE_PATH}.new || NEED_COMPOSE_UPDATE=1
@@ -275,6 +276,7 @@ elif [[ "$MODE" == "DOCKER" ]]; then
       {
         if [[ -f ${DOCKER_COMPOSE_PATH}.new ]]; then
           $SUDO mv -f ${DOCKER_COMPOSE_PATH}.new ${DOCKER_COMPOSE_PATH} &> /dev/null
+          $SUDO chown ${USERID}:${GROUPID} ${DOCKER_COMPOSE_PATH}
         fi
       } || {
         cwarn "Failed to update docker compose file"
@@ -294,8 +296,8 @@ elif [[ "$MODE" == "DOCKER" ]]; then
   fi
 
   # Delete files that may be left behind
-  rm ${DOCKER_COMPOSE_PATH}.new &> /dev/null
-  rm ${SCRIPT_DIR}/${SRVNAME_FULL}.new &> /dev/null
+  rm ${DOCKER_COMPOSE_PATH}.new &> /dev/null || true
+  rm ${SCRIPT_DIR}/${SRVNAME_FULL}.new &> /dev/null || true
 
   # Restart service
   if [[ "$SERVICE_STOPPED" == 1 ]]; then

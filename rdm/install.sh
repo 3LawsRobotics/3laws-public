@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-SCRIPT_VERSION="v0.5.0"
+SCRIPT_VERSION="v0.5.1"
 
 # Exit on errors
 set -e
@@ -131,14 +131,15 @@ function promptChoiceLaunch()
 # Usage info
 show_help() {
 cat << EOF
-Usage: ${0##*/} [-h] [-y] [-i package|docker] [-s auto|manual] [-t <DOCKER_TOKEN>] <COMPANY_ID>
+Usage: ${0##*/} [-h] [-y] [-i package|docker] [-s auto|manual] [-t <DOCKER_TOKEN>] [-r <ROBOT_ID>] <COMPANY_ID>
 Install 3Laws Robot Diagnostic Module
    -h                 show this help menu
    -y                 answer yes to all yes/no questions
    -i package|docker  install mode
    -s auto|manual     start mode
    -t <DOCKER_TOKEN>  docker api token
-If -i or -s are not specified, you will be prompted during the installation
+   -r <ROBOT_ID>      robot identified
+If -i, -s, -t, or -r are not specified, you will be prompted during the installation
 EOF
 }
 
@@ -147,8 +148,9 @@ ALWAYS_YES=0
 INSTALL_MODE=""
 START_MODE=""
 DOCKER_TOKEN=""
+ROBOT_ID=""
 
-while getopts hyi:s:t: opt; do
+while getopts hyi:s:r:t: opt; do
   case $opt in
     h)
       show_help
@@ -161,6 +163,8 @@ while getopts hyi:s:t: opt; do
     s)  START_MODE=$(echo "${OPTARG}" | tr '[:upper:]' '[:lower:]')
       ;;
     t)  DOCKER_TOKEN="${OPTARG}"
+      ;;
+    r)  ROBOT_ID="${OPTARG}"
       ;;
     *)
       show_help >&2
@@ -218,8 +222,14 @@ cd $LAWS3_DIR
 
 # Check if company id set
 if [ -z "$COMPANY_ID" ]; then
-  cerr "COMPANY_ID variable not defined!"
+  cerr "Script must be called with at least one argument : <COMPANY_ID> !"
   exit -1
+fi
+
+# Check if ROBOT_ID variable set
+if [ -z "$ROBOT_ID" ]; then
+  cin "Please provide your robot identifier (or leave empty if you want to define it later):"
+  read ROBOT_ID
 fi
 
 # Install mode prompt
@@ -331,7 +341,7 @@ if [[ "$INSTALL_MODE" == "package" ]]; then
       SRVNAME=3laws_rdm_ros2.service
       cout "Installing daemon..."
       cd $LAWS3_DIR/$PACKAGE_DIR/rdm
-      sed "s+@LAWS3_WS@+$(pwd)+g; s+@ROS_DISTRO@+${ROS_DISTRO}+g; s+@USERID@+${USERID}+g; s+@GROUPID@+${GROUPID}+g" ${SRVNAME} \
+      sed "s+@LAWS3_WS@+$(pwd)+g; s+@ROS_DISTRO@+${ROS_DISTRO}+g; s+@USERID@+${USERID}+g; s+@GROUPID@+${GROUPID}+g; s+@LAWS3_ROBOT_ID@+${ROBOT_ID}+g;" ${SRVNAME} \
         > $LAWS3_DIR/${SRVNAME}
       $SUDO mv -f $LAWS3_DIR/${SRVNAME} /etc/systemd/system/${SRVNAME} &> /dev/null
       $SUDO systemctl daemon-reload
@@ -343,7 +353,7 @@ if [[ "$INSTALL_MODE" == "package" ]]; then
       cout "Adding cron update job..."
       $SUDO crontab -l > crontmp
       sed -i "/$3LAWS_RDM_UPDATE_PACKAGE'$/d" crontmp # Remove previous versions of job
-      LINE="0 * * * * bash -c 'bash <(curl -fsSL https://raw.githubusercontent.com/3LawsRobotics/3laws-public/${BRANCH}/rdm/update.sh) PACKAGE ${COMPANY_ID} ${HOME} ${LAWS3_DIR} $(whoami) ${USERID} ${GROUPID} ${SRVNAME} ${ROS_DISTRO} 2>&1 | /usr/bin/logger -t 3LAWS_RDM_UPDATE_PACKAGE'"
+      LINE="* * * * * bash -c 'bash <(curl -fsSL https://raw.githubusercontent.com/3LawsRobotics/3laws-public/${BRANCH}/rdm/update.sh) PACKAGE ${COMPANY_ID} ${HOME} ${LAWS3_DIR} $(whoami) ${USERID} ${GROUPID} \"${ROBOT_ID}\" ${SRVNAME} ${ROS_DISTRO} 2>&1 | /usr/bin/logger -t 3LAWS_RDM_UPDATE_PACKAGE'"
       echo "${LINE}" >> crontmp
       $SUDO crontab crontmp
       $SUDO service cron reload &> /dev/null
@@ -364,12 +374,15 @@ if [[ "$INSTALL_MODE" == "package" ]]; then
     echo -e "  $SUDO systemctl disable ${SRVNAME}"
   )
   else # Manual
+    if [ -n "${ROBOT_ID}" ]; then
+      ROBOT_ID_STR=" robot_id:=\"${ROBOT_ID}\""
+    fi
     cout "In that case, please add the following line to your .bashrc:"
     echo -e "  source ${PWD}/${PACKAGE_DIR}/rdm/ROS2/local_setup.bash"
     cout "Source your bashrc :"
     echo -e "  source ~/.bashrc"
     cout "And either Launch diagnostic module:"
-    echo -e "  ros2 launch lll_rdm rdm.launch.py"
+    echo -e "  ros2 launch lll_rdm rdm.launch.py${ROBOT_ID_STR}"
     cout "or add the following action to the LaunchDescription in your launch file:"
     echo -e "  from launch.actions import IncludeLaunchDescription"
     echo -e "  from launch.launch_description_sources import PythonLaunchDescriptionSource"
@@ -387,6 +400,9 @@ if [[ "$INSTALL_MODE" == "package" ]]; then
     echo -e "      ),"
     echo -e "      launch_arguments={"
     echo -e "          'log_stdout_disabled': 'true',"
+    if [ -n "${ROBOT_ID}" ]; then
+      echo -e "          'robot_id': '${ROBOT_ID}',"
+    fi
     echo -e "      }.items(),"
     echo -e "  )"
     echo -e " "
@@ -397,10 +413,13 @@ elif [[ "$INSTALL_MODE" == "docker" ]]; then
   cout "Install diagnostic module as a docker container..."
 
   # Check if DOCKER_TOKEN variable set
-  if [ -z "$DOCKER_TOKEN" ]; then
-    cerr "DOCKER_TOKEN not specified, cannot pull docker! Use -t <DOCKER_TOKEN>"
-    exit -1
-  fi
+  while [ -z "$DOCKER_TOKEN" ]; do
+    cin "Please provide your docker token:"
+    read DOCKER_TOKEN
+    if [ -z "$DOCKER_TOKEN" ]; then
+      cerr "Docker token cannot be empty!"
+    fi
+  done
 
   # Check docker installed
   {
@@ -496,7 +515,7 @@ elif [[ "$INSTALL_MODE" == "docker" ]]; then
 
       if [[ "${LOCAL_INSTALL}" == 1 ]]; then
         cat "${CURRENT_SCRIPT_DIR}/${DOCKER_COMPOSE_NAME}" | \
-          sed "s+@DOCKER_IMAGE_LINK@+${DOCKER_IMAGE_LINK}+g; s+@HOME@+${HOME}+g; s+@USERID@+${USERID}+g; s+@GROUPID@+${GROUPID}+g" > ${DOCKER_COMPOSE_PATH}
+          sed "s+@DOCKER_IMAGE_LINK@+${DOCKER_IMAGE_LINK}+g; s+@HOME@+${HOME}+g; s+@USERID@+${USERID}+g; s+@GROUPID@+${GROUPID}+g; s+@LAWS3_ROBOT_ID@+${ROBOT_ID}+g" > ${DOCKER_COMPOSE_PATH}
 
         cat "${CURRENT_SCRIPT_DIR}/${SRVNAME_FULL}" | \
           sed "s+@DOCKER_COMPOSE_PATH@+${DOCKER_COMPOSE_PATH}+g; s+@USERID@+${USERID}+g; s+@GROUPID@+${GROUPID}+g" > \
@@ -504,7 +523,7 @@ elif [[ "$INSTALL_MODE" == "docker" ]]; then
 
       else
         curl -fsSL "https://raw.githubusercontent.com/3LawsRobotics/3laws-public/${BRANCH}/rdm/${DOCKER_COMPOSE_NAME}" | \
-          sed "s+@DOCKER_IMAGE_LINK@+${DOCKER_IMAGE_LINK}+g; s+@HOME@+${HOME}+g; s+@USERID@+${USERID}+g; s+@GROUPID@+${GROUPID}+g" > ${DOCKER_COMPOSE_PATH}
+          sed "s+@DOCKER_IMAGE_LINK@+${DOCKER_IMAGE_LINK}+g; s+@HOME@+${HOME}+g; s+@USERID@+${USERID}+g; s+@GROUPID@+${GROUPID}+g; s+@LAWS3_ROBOT_ID@+${ROBOT_ID}+g" > ${DOCKER_COMPOSE_PATH}
 
         curl -fsSL "https://raw.githubusercontent.com/3LawsRobotics/3laws-public/${BRANCH}/rdm/${SRVNAME_FULL}" | \
           sed "s+@DOCKER_COMPOSE_PATH@+${DOCKER_COMPOSE_PATH}+g; s+@USERID@+${USERID}+g; s+@GROUPID@+${GROUPID}+g" > \
@@ -521,7 +540,7 @@ elif [[ "$INSTALL_MODE" == "docker" ]]; then
       cout "Adding cron update job..."
       $SUDO crontab -l > crontmp
       sed -i "/$3LAWS_RDM_UPDATE_DOCKER'$/d" crontmp # Remove previous versions of job
-      LINE="30 * * * * bash -c 'bash <(curl -fsSL https://raw.githubusercontent.com/3LawsRobotics/3laws-public/${BRANCH}/rdm/update.sh) DOCKER ${COMPANY_ID} ${HOME} ${LAWS3_DIR} $(whoami) ${USERID} ${GROUPID} NO_PULL 2>&1 | /usr/bin/logger -t 3LAWS_RDM_UPDATE_DOCKER'"
+      LINE="* * * * * bash -c 'bash <(curl -fsSL https://raw.githubusercontent.com/3LawsRobotics/3laws-public/${BRANCH}/rdm/update.sh) DOCKER ${COMPANY_ID} ${HOME} ${LAWS3_DIR} $(whoami) ${USERID} ${GROUPID} \"${ROBOT_ID}\" NO_PULL 2>&1 | /usr/bin/logger -t 3LAWS_RDM_UPDATE_DOCKER'"
       echo "${LINE}" >> crontmp
       $SUDO crontab crontmp
       $SUDO service cron reload &> /dev/null
@@ -544,10 +563,13 @@ elif [[ "$INSTALL_MODE" == "docker" ]]; then
     echo -e "  $SUDO systemctl enable ${SRVNAME_FULL}"
 
   else
+    if [ -n "${ROBOT_ID}" ]; then
+      ROBOT_ID_STR=" -e LAWS3_ROBOT_ID=\"${ROBOT_ID}\""
+    fi
     cout "In that case, run the following commands to start the docker container:"
-    echo -e "docker run -it --rm --name 3laws_rdm -u ${USERID}:${GROUPID} --net=host --pid=host -v /dev/shm:/dev/shm -v /etc/machine-id:/3laws_robotics/machine-id $DOCKER_IMAGE_LINK"
+    echo -e "docker run -it --rm --name 3laws_rdm -u ${USERID}:${GROUPID}${ROBOT_ID_STR} --net=host --pid=host -v /dev/shm:/dev/shm -v /etc/machine-id:/3laws_robotics/machine-id $DOCKER_IMAGE_LINK"
     cout "If you want to run the container in detached mode:"
-    echo -e "docker run -d --rm --name 3laws_rdm -u ${USERID}:${GROUPID} --net=host --pid=host  -v /dev/shm:/dev/shm -v /etc/machine-id:/3laws_robotics/machine-id $DOCKER_IMAGE_LINK"
+    echo -e "docker run -d --rm --name 3laws_rdm -u ${USERID}:${GROUPID}${ROBOT_ID_STR} --net=host --pid=host  -v /dev/shm:/dev/shm -v /etc/machine-id:/3laws_robotics/machine-id $DOCKER_IMAGE_LINK"
   fi
 else
   cerr "Unkown update mode, should be one of : [PACKAGE, DOCKER]"

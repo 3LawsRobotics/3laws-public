@@ -1,45 +1,42 @@
 #!/usr/bin/env bash
-SCRIPT_VERSION="v0.3.2"
+SCRIPT_VERSION="0.3.3"
+
+# Exit on errors
+set -e
 
 # Colors
-NC='\033[0m'       # Text Reset
-On_Black='\033[40m'       # Black background
-On_Purple='\033[45m'      # Purple background
-On_Cyan='\033[46m'        # Cyan background
-On_Green='\033[42m'       # Green background
-BIRed='\033[1;91m'        # Bold Intense Red
-BWhite='\033[1;37m'       # Bold White
-BIYellow='\033[1;93m'     # Bold Intense Yellow
-White='\033[0;37m'        # White
+NC='\033[0m'          # Text Reset
+On_Black='\033[40m'   # Black background
+On_Purple='\033[45m'  # Purple background
+On_Cyan='\033[46m'    # Cyan background
+On_Green='\033[42m'   # Green background
+BIRed='\033[1;91m'    # Bold Intense Red
+BWhite='\033[1;37m'   # Bold White
+BIYellow='\033[1;93m' # Bold Intense Yellow
+White='\033[0;37m'    # White
 
-
-# Colors
+# Printing utilities
 ColErr=${BIRed}${On_Black}
 ColPrompt=${BWhite}${On_Cyan}
 ColInfo=${White}${On_Purple}
 ColWarn=${BIYellow}${On_Black}
-
-function cout()
-{
+cout() {
   echo -e "${ColInfo}${1}${NC}"
 }
-
-function cin()
-{
+cin() {
   echo -e "${ColPrompt}${1}${NC}"
 }
-
-function cerr()
-{
+cerr() {
   echo -e "${ColErr}${1}${NC}"
 }
-function cwarn()
-{
+cwarn() {
   echo -e "${ColWarn}${1}${NC}"
 }
+ctitle() {
+  echo -e "${BWhite}${On_Green}${1}${NC}"
+}
 
-function promptYesNo()
-{
+promptYesNo() {
   local REPLY=${2}
   local TXT="[y/n]"
 
@@ -54,37 +51,34 @@ function promptYesNo()
   while true; do
     local color=$'\033[1;37m\033[46m'
     local noColor=$'\033[0m'
-    read -e -p "${color}${1} ${TXT}?${noColor} " yn
+    read -r -e -p "$color${1} $TXT?$noColor " yn
 
     case $yn in
-      y|Y|Yes|yes|YES)
-        REPLY=1
+    y | Y | Yes | yes | YES)
+      REPLY=1
+      break
+      ;;
+    n | N | No | no | NO)
+      REPLY=0
+      break
+      ;;
+    "")
+      if [ -n "$REPLY" ]; then
         break
+      fi
       ;;
-      n|N|No|no|NO)
-        REPLY=0
-        break
-      ;;
-      "")
-        if [ ! -z $REPLY ]; then
-          break
-        fi
-      ;;
-      * )
-      ;;
+    *) ;;
     esac
   done
 
   echo "$REPLY"
 }
 
-LAWS3_DIR="${HOME}/3lawsRoboticsInc"
-
-# Exit on errors
-set -e
+# Define some variables
+LAWS3_DIR="$HOME/3lawsRoboticsInc"
 
 # Main
-echo -e "${BWhite}${On_Green}3Laws Robot Diagnostic Module Uninstaller (${SCRIPT_VERSION})${NC}"
+ctitle "3Laws Robot Diagnostic Module uninstaller (v$SCRIPT_VERSION)"
 
 # Checking if root
 SUDO="sudo"
@@ -96,42 +90,38 @@ fi
 if [ -d "${LAWS3_DIR}" ]; then
   cout "Removing '${LAWS3_DIR}' directory..."
   {
-    rm -rf $LAWS3_DIR
+    rm -rf "$LAWS3_DIR"
   } || {
-    warn "Failed to delete `${LAWS3_DIR}` directory. Make sure you have correct write access to this directory!"
+    warn "Failed to delete '$LAWS3_DIR' directory. Make sure you have correct write access to this directory!"
   }
 fi
 
-function remove_service()
-{
+remove_service() {
   SERVICE_ACTIVE=0
-  $SUDO systemctl cat -- ${SRVNAME} &> /dev/null && SERVICE_ACTIVE=1
+  $SUDO systemctl cat -- "$1" &>/dev/null && SERVICE_ACTIVE=1
   if [[ "$SERVICE_ACTIVE" == 1 ]]; then
-    cout "Removing '${SRVNAME}' daemon..."
+    cout "Removing '$1' daemon..."
     {
-      $SUDO systemctl stop ${SRVNAME} &> /dev/null
-      $SUDO systemctl disable ${SRVNAME} &> /dev/null
-      $SUDO rm /etc/systemd/system/${SRVNAME}
+      $SUDO systemctl stop "$1" &>/dev/null
+      $SUDO systemctl disable "$1" &>/dev/null
+      $SUDO rm /etc/systemd/system/"$1"
     } || {
-      warn "Failed to remove `${SRVNAME}` daemon, you may want to make sure there are not lingering services running!"
+      warn "Failed to remove '$1' daemon, you may want to make sure there are not lingering services running: '$SUDO systemctl status $SRVNAME'!"
     }
   fi
 }
 
 # Check if service is running
-SRVNAME=3laws_rdm_ros2.service
-remove_service
-
-SRVNAME=3laws_rdm_docker.service
-remove_service
+remove_service 3laws_rdm_ros2.service
+remove_service 3laws_rdm_docker.service
 
 # Remove cron jobs
-cd $SCRIPT_DIR
+cd "$SCRIPT_DIR"
 {
   $SUDO crontab -l | sed "/$3LAWS_RDM_UPDATE_PACKAGE'$/d" | sed "/$3LAWS_RDM_UPDATE_DOCKER'$/d" | $SUDO crontab
-  $SUDO service cron reload &> /dev/null
+  $SUDO service cron reload &>/dev/null
 } || {
-  warn "Failed to remove cron update jobs, you may want to check you cron jobs: $SUDO crontab -e"
+  warn "Failed to remove cron update jobs, you may want to check you cron jobs: '$SUDO crontab -e'"
 }
 
-cout "Uninstall successful!"
+cout "Uninstall finished!"

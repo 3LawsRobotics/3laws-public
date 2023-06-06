@@ -10,3 +10,8 @@ If `-i` or `-s` are not specified, you will be prompted during the installation.
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/3LawsRobotics/3laws-public/master/rdm/uninstall.sh)
 ```
+
+## Ros2 node and topic discovery script:
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/3LawsRobotics/3laws-public/master/rdm/ros_graph_discovery.sh)
+```

@@ -16,7 +16,7 @@ do
   echo "-----------------" >> ros_network_info.txt
 
   # Get the info for the current topic
-  ros2 topic info $topic >> ros_network_info.txt
+  ros2 topic info -v $topic >> ros_network_info.txt
 
   echo "=================" >> ros_network_info.txt
 done

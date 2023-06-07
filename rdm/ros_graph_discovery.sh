@@ -4,7 +4,7 @@
 set -e
 
 HAS_ROS1=0
-if command -v rostopic list &>/dev/null; then
+if command -v rosversion -d &>/dev/null; then
   HAS_ROS1=1
 fi
 HAS_ROS2=0
@@ -15,46 +15,50 @@ fi
 # shellcheck disable=SC2129
 # Get the list of topics
 if [ "$HAS_ROS1" -eq 1 ]; then
-  {
-    topicsRos1=$(rostopic list)
+  if rostopic list &>/dev/null; then
+    {
+      topicsRos1=$(rostopic list)
 
-    echo "starting scan"
-    echo "======= TOPICS ========" >ros1_network_info.txt
-    echo >>ros1_network_info.txt
-    # Iterate through each topic
-    for topic in $topicsRos1; do
-      echo "exploring topic: $topic"
-      echo "Topic: $topic" >>ros1_network_info.txt
-      echo "-----------------" >>ros1_network_info.txt
+      echo "starting scan"
+      echo "======= TOPICS ========" >ros1_network_info.txt
+      echo >>ros1_network_info.txt
+      # Iterate through each topic
+      for topic in $topicsRos1; do
+        echo "exploring topic: $topic"
+        echo "Topic: $topic" >>ros1_network_info.txt
+        echo "-----------------" >>ros1_network_info.txt
 
-      # Get the info for the current topic
-      rostopic info "$topic" >>ros1_network_info.txt
+        # Get the info for the current topic
+        rostopic info "$topic" >>ros1_network_info.txt
 
-      echo "=================" >>ros1_network_info.txt
-    done
+        echo "=================" >>ros1_network_info.txt
+      done
 
-    echo >>ros1_network_info.txt
-    echo >>ros1_network_info.txt
-    echo "======= NODES ========" >>ros1_network_info.txt
-    echo >>ros1_network_info.txt
-    # Get the list of topics
-    nodes=$(rosnode list)
+      echo >>ros1_network_info.txt
+      echo >>ros1_network_info.txt
+      echo "======= NODES ========" >>ros1_network_info.txt
+      echo >>ros1_network_info.txt
+      # Get the list of topics
+      nodes=$(rosnode list)
 
-    # Iterate through each topic
-    for node in $nodes; do
-      echo "exploring node: $node"
-      echo "Node: $node" >>ros1_network_info.txt
-      echo "-----------------" >>ros1_network_info.txt
+      # Iterate through each topic
+      for node in $nodes; do
+        echo "exploring node: $node"
+        echo "Node: $node" >>ros1_network_info.txt
+        echo "-----------------" >>ros1_network_info.txt
 
-      # Get the info for the current topic
-      rosnode info "$node" >>ros1_network_info.txt
+        # Get the info for the current topic
+        rosnode info "$node" >>ros1_network_info.txt
 
-      echo "=================" >>ros1_network_info.txt
-    done
-    echo "End of ROS1 scan, results saved in ros1_network_info.txt"
-  } || {
-    echo "Failed to discover ROS1 topics, is ros master up? Passing to ROS2"
-  }
+        echo "=================" >>ros1_network_info.txt
+      done
+      echo "End of ROS1 scan, results saved in ros1_network_info.txt"
+    } || {
+      echo "Failed to discover ROS1 topics, passing to ROS2"
+    }
+  else
+    echo "ros master doesn't seem to be up"
+  fi
 else
   echo "ROS1 not found, passing to ROS2"
 fi

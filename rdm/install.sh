@@ -391,7 +391,7 @@ if [[ $INSTALL_MODE == "package" ]]; then
     echo -e "          )"
     echo -e "      ),"
     echo -e "      launch_arguments={"
-    echo -e "          'log_stdout_disabled': 'true',"
+    echo -e "          'log_stdout_disabled': 'false',"
     if [ -n "$ROBOT_ID" ]; then
       echo -e "          'robot_id': '$ROBOT_ID',"
     fi

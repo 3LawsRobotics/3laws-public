@@ -5,10 +5,12 @@ set -e
 
 HAS_ROS1=0
 if command -v rosversion -d &>/dev/null; then
+  ROS1_VERSION=$(rosversion -d)
   HAS_ROS1=1
 fi
 HAS_ROS2=0
 if command -v ros2 topic list &>/dev/null; then
+  ROS2_VERSION="$ROS_DISTRO"
   HAS_ROS2=1
 fi
 
@@ -20,7 +22,8 @@ if [ "$HAS_ROS1" -eq 1 ]; then
       topicsRos1=$(rostopic list)
 
       echo "starting scan"
-      echo "======= TOPICS ========" >ros1_network_info.txt
+      echo "Ros version: ${ROS1_VERSION}" >ros1_network_info.txt
+      echo "======= TOPICS ========" >>ros1_network_info.txt
       echo >>ros1_network_info.txt
       # Iterate through each topic
       for topic in $topicsRos1; do
@@ -70,7 +73,8 @@ if [ "$HAS_ROS2" -eq 1 ]; then
 
     topicsRos2=$(ros2 topic list) &>/dev/null
 
-    echo "======= TOPICS ========" >ros2_network_info.txt
+    echo "Ros version: ${ROS2_VERSION}" >ros2_network_info.txt
+    echo "======= TOPICS ========" >>ros2_network_info.txt
     echo >>ros2_network_info.txt
     # Iterate through each topic
     for topic in $topicsRos2; do

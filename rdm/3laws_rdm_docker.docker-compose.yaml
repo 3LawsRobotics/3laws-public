@@ -7,7 +7,6 @@ services:
     volumes:
       - /etc/machine-id:/3laws_robotics/machine-id
       - /dev/shm:/dev/shm
-    restart: on-failure
     stop_signal: SIGINT
     pid: host
     network_mode: host

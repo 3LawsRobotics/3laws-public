@@ -12,7 +12,7 @@ RestartSec=10
 User=@USERID@
 Group=@GROUPID@
 ExecStartPre=docker compose -f @DOCKER_COMPOSE_PATH@ down
-ExecStart=docker compose -f @DOCKER_COMPOSE_PATH@ up
+ExecStart=docker compose -f @DOCKER_COMPOSE_PATH@ --abort-on-container-exit up
 ExecStop=docker compose -f @DOCKER_COMPOSE_PATH@ down
 TimeoutSec=10
 

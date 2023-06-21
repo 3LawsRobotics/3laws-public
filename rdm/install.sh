@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-SCRIPT_VERSION="0.5.2"
+SCRIPT_VERSION="0.5.3"
 
 # Exit on errors
 set -e
@@ -329,11 +329,11 @@ if [[ $INSTALL_MODE == "package" ]]; then
   if [[ $START_MODE == "auto" ]]; then
     (
       {
+        LLL_WS="$LAWS3_DIR/$PACKAGE_DIR"
         # Systemctl
         SRVNAME=3laws_rdm_ros2.service
         cout "Installing daemon..."
-        cd "$LAWS3_DIR/$PACKAGE_DIR/packages"
-        sed "s+@LLL_WS@+$(pwd)+g; s+@ROS_DISTRO@+$ROS_DISTRO+g; s+@USERID@+$USERID+g; s+@GROUPID@+$GROUPID+g; s+@LAWS3_ROBOT_ID@+$ROBOT_ID+g;" $SRVNAME \
+        sed "s+@LLL_WS@+$LLL_WS+g; s+@ROS_DISTRO@+$ROS_DISTRO+g; s+@USERID@+$USERID+g; s+@GROUPID@+$GROUPID+g; s+@LAWS3_ROBOT_ID@+$ROBOT_ID+g;" "$LLL_WS/packages/$SRVNAME" \
           >"$LAWS3_DIR/$SRVNAME"
         $SUDO mv -f "$LAWS3_DIR/$SRVNAME" "/etc/systemd/system/$SRVNAME" &>/dev/null
         $SUDO systemctl daemon-reload
@@ -373,8 +373,8 @@ if [[ $INSTALL_MODE == "package" ]]; then
     echo -e "  source $PWD/$PACKAGE_DIR/packages/ROS2/local_setup.bash"
     cout "Source your bashrc :"
     echo -e "  source ~/.bashrc"
-    cout "And either Launch diagnostic module:"
-    echo -e "  ros2 launch lll_rdm rdm.launch.py$ROBOT_ID_STR"
+    cout "And either launch the diagnostic module directly:"
+    echo -e "  ros2 launch lll_rdm rdm.launch.py log_level:=info $ROBOT_ID_STR"
     cout "or add the following action to the LaunchDescription in your launch file:"
     echo -e "  from launch.actions import IncludeLaunchDescription"
     echo -e "  from launch.launch_description_sources import PythonLaunchDescriptionSource"
@@ -391,7 +391,7 @@ if [[ $INSTALL_MODE == "package" ]]; then
     echo -e "          )"
     echo -e "      ),"
     echo -e "      launch_arguments={"
-    echo -e "          'log_stdout_disabled': 'false',"
+    echo -e "          'log_level': 'info',"
     if [ -n "$ROBOT_ID" ]; then
       echo -e "          'robot_id': '$ROBOT_ID',"
     fi

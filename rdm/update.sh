@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-SCRIPT_VERSION="0.4.2"
+SCRIPT_VERSION="0.4.3"
 
 # Exit on errors
 set -e
@@ -16,6 +16,14 @@ cwarn() {
 }
 ctitle() {
   echo -e "${1}"
+}
+
+run_sudo() {
+  if [ -z "$SUDO" ]; then
+    runuser -l "$CURRENT_USER" -c "$1"
+  else
+    eval "$1"
+  fi
 }
 
 # Define some variables
@@ -99,35 +107,52 @@ if [[ $MODE == "PACKAGE" ]]; then
 
   # Check if git repo has been modified
   cd "$LAWS3_DIR/$PACKAGE_DIR"
-  CMD1="cd $LAWS3_DIR/$PACKAGE_DIR; git fetch origin &> /dev/null"
-  CMD2="cd $LAWS3_DIR/$PACKAGE_DIR; git merge-base --is-ancestor HEAD origin/master || echo 1"
-  CMD3="cd $LAWS3_DIR/$PACKAGE_DIR; git status --porcelain"
-  if [ -z "$SUDO" ]; then
-    runuser -l "$CURRENT_USER" -c "$CMD1"
-    DIRTY1=$(runuser -l "$CURRENT_USER" -c "$CMD2")
-    DIRTY2=$(runuser -l "$CURRENT_USER" -c "$CMD3")
-  else
 
-    eval "$CMD1"
-    DIRTY1=$(eval "$CMD2")
-    DIRTY2=$(eval "$CMD3")
+  ORIGINAL_BRANCH=$(run_sudo "git rev-parse --abbrev-ref HEAD")
+
+  if [[ $ORIGINAL_BRANCH == "HEAD" ]]; then
+    echo "Currently on detached head. Aborting update..."
+    exit 131
   fi
 
-  if [[ -n $DIRTY1 || -n $DIRTY2 ]]; then
-    cerr "Changes detected to Diagnostic Module repo, updated aborted!"
-    exit 16
+  # Stash uncommited changes
+  UNCOMMITED_CHANGED=$(run_sudo "cd $LAWS3_DIR/$PACKAGE_DIR; git status --porcelain")
+  BRANCHED_OFF_CHANGES=$(run_sudo "cd $LAWS3_DIR/$PACKAGE_DIR; git merge-base --is-ancestor HEAD origin/$BRANCH || echo 1")
+  if [[ -n $UNCOMMITED_CHANGED ]]; then
+    cout "Uncommited changes detected on repo, will stash changes for you and try to pop them after update..."
+    run_sudo "git stash push"
   fi
 
-  # Check package need updating
-  CMD="cd $LAWS3_DIR/$PACKAGE_DIR; git diff --quiet HEAD origin/master -- || echo 1"
-  if [ -z "$SUDO" ]; then
-    UPDATE_AVAILABLE=$(runuser -l "$CURRENT_USER" -c "$CMD")
-  else
-    UPDATE_AVAILABLE=$(eval "$CMD")
+  checkout_original() {
+    if ! run_sudo "git checkout $ORIGINAL_BRANCH"; then
+      echo "git checkout of original branch '$ORIGINAL_BRANCH' failed."
+      exit 131
+    fi
+  }
+
+  pop_stash() {
+    if [[ -n $UNCOMMITED_CHANGED ]]; then
+      cout "Poping stash"
+      if ! run_sudo "git stash pop"; then
+        echo "Stash pop encountered conflicts"
+        exit 131
+      fi
+    fi
+  }
+
+  # Checkout master
+  if ! run_sudo "git checkout $BRANCH"; then
+    echo "Failed to checkout master conflicts. Aborting update..."
+    exit 131
   fi
 
+  # Check if update available
+  run_sudo "cd $LAWS3_DIR/$PACKAGE_DIR; git fetch origin &> /dev/null"
+  UPDATE_AVAILABLE=$(run_sudo "cd $LAWS3_DIR/$PACKAGE_DIR; git diff --quiet HEAD origin/$BRANCH -- || echo 1")
   if [ -z "$UPDATE_AVAILABLE" ]; then
     cout "No update available."
+    checkout_original
+    pop_stash
     exit 0
   fi
   cout "Update available, updating..."
@@ -152,14 +177,11 @@ if [[ $MODE == "PACKAGE" ]]; then
   # Pull repo
   {
     cout "Pulling repo..."
-    CMD="cd $LAWS3_DIR/$PACKAGE_DIR; git pull &> /dev/null"
-    if [ -z "$SUDO" ]; then
-      runuser -l "$CURRENT_USER" -c "$CMD"
-    else
-      eval "$CMD"
-    fi
+    run_sudo "cd $LAWS3_DIR/$PACKAGE_DIR; git pull &> /dev/null"
   } || {
     cerr "Failed to update repo!"
+    checkout_original
+    pop_stash
     exit 13
   }
 
@@ -167,8 +189,8 @@ if [[ $MODE == "PACKAGE" ]]; then
   if [[ $SERVICE_EXISTS == 1 ]]; then
     cout "Updating daemon..."
     {
-      cd "$LAWS3_DIR/$PACKAGE_DIR/packages"
-      sed "s+@LLL_WS@+$(pwd)+g; s+@ROS_DISTRO@+$ROS_DISTRO_LOCAL+g; s+@USERID@+$USERID+g; s+@GROUPID@+$GROUPID+g; s+@LAWS3_ROBOT_ID@+$ROBOTID+g" "$SRVNAME" >"$LAWS3_DIR/$SRVNAME"
+      LLL_WS="$LAWS3_DIR/$PACKAGE_DIR"
+      sed "s+@LLL_WS@+$LLL_WS+g; s+@ROS_DISTRO@+$ROS_DISTRO_LOCAL+g; s+@USERID@+$USERID+g; s+@GROUPID@+$GROUPID+g; s+@LAWS3_ROBOT_ID@+$ROBOTID+g" "$LLL_WS/packages/$SRVNAME" >"$LAWS3_DIR/$SRVNAME"
       $SUDO mv -f "$LAWS3_DIR/$SRVNAME" "/etc/systemd/system/$SRVNAME" &>/dev/null
       $SUDO systemctl daemon-reload
     } || {
@@ -185,6 +207,18 @@ if [[ $MODE == "PACKAGE" ]]; then
       cwarn "Failed to start Diagnostic Module service, you may have to start it by hand!"
     }
   fi
+
+  # Rebase changes
+  if [[ -n $BRANCHED_OFF_CHANGES ]]; then
+    checkout_original
+    cout "Changes not pushed detected on repo, will try to rebase for you..."
+    if ! run_sudo "git rebase origin/$BRANCH"; then
+      echo "Rebase encountered conflicts. Aborting update..."
+      run_sudo "git rebase --abort"
+      exit 131
+    fi
+  fi
+  pop_stash
 
 elif [[ $MODE == "DOCKER" ]]; then
   cout "Docker update mode"

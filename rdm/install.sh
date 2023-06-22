@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-SCRIPT_VERSION="0.5.3"
+SCRIPT_VERSION="0.5.4"
 
 # Exit on errors
 set -e
@@ -204,6 +204,7 @@ fi
 # Create 3laws directory
 {
   mkdir -p "$SCRIPT_DIR"
+  mkdir -p "$LAWS3_DIR/config"
 } || {
   cerr "Cannot create '$LAWS3_DIR' directory, make sure you have write access to your home folder!"
   exit 13
@@ -369,13 +370,13 @@ if [[ $INSTALL_MODE == "package" ]]; then
     if [ -n "$ROBOT_ID" ]; then
       ROBOT_ID_STR=" robot_id:=\"$ROBOT_ID\""
     fi
-    cout "In that case, please add the following line to your .bashrc:"
+    cout "To run the diagnostic module directly, execute the following command:"
+    echo -e "$PWD/$PACKAGE_DIR/packages/start_rdm.sh log_level:=info$ROBOT_ID_STR"
+    cout "If you want to start it as part of your launch system, add the following line to your .bashrc:"
     echo -e "  source $PWD/$PACKAGE_DIR/packages/ROS2/local_setup.bash"
     cout "Source your bashrc :"
     echo -e "  source ~/.bashrc"
-    cout "And either launch the diagnostic module directly:"
-    echo -e "  ros2 launch lll_rdm rdm.launch.py log_level:=info $ROBOT_ID_STR"
-    cout "or add the following action to the LaunchDescription in your launch file:"
+    cout "Add the following action to the LaunchDescription in your launch file:"
     echo -e "  from launch.actions import IncludeLaunchDescription"
     echo -e "  from launch.launch_description_sources import PythonLaunchDescriptionSource"
     echo -e "  from launch.substitutions import PathJoinSubstitution"
@@ -398,6 +399,7 @@ if [[ $INSTALL_MODE == "package" ]]; then
     echo -e "      }.items(),"
     echo -e "  )"
     echo -e " "
+    cout "For more information see your readme: https://github.com/3LawsRobotics/3laws_$COMPANY_ID/blob/$BRANCH/README.md"
   fi
 
 elif [[ "$INSTALL_MODE" == "docker" ]]; then
@@ -558,8 +560,9 @@ elif [[ "$INSTALL_MODE" == "docker" ]]; then
     echo -e "docker run -it --rm --name 3laws_rdm -u $USERID:$GROUPID$ROBOT_ID_STR --net=host --pid=host -v /dev/shm:/dev/shm -v /etc/machine-id:/3laws_robotics/machine-id $DOCKER_IMAGE_LINK"
     cout "If you want to run the container in detached mode:"
     echo -e "docker run -d --rm --name 3laws_rdm -u $USERID:$GROUPID$ROBOT_ID_STR --net=host --pid=host  -v /dev/shm:/dev/shm -v /etc/machine-id:/3laws_robotics/machine-id $DOCKER_IMAGE_LINK"
+    cout "For more information see your readme: https://github.com/3LawsRobotics/3laws_$COMPANY_ID/blob/$BRANCH/README.md"
   fi
 else
-  cerr "Unkown update mode, should be one of : [PACKAGE, DOCKER]"
+  cerr "Unkown install mode, should be one of : [package, docker]"
   exit 22
 fi

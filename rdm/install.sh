@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-SCRIPT_VERSION="0.5.4"
+SCRIPT_VERSION="0.5.5"
 
 # Exit on errors
 set -e
@@ -236,35 +236,15 @@ if [[ $INSTALL_MODE == "package" ]]; then
   cout "Install diagnostic module as a package..."
 
   # Install dependencies
-  STDLIB=libstdc++-11-dev
-  STDLIB_INSTALLED=0
-  dpkg -l $STDLIB &>/dev/null && STDLIB_INSTALLED=1
   SED_INSTALLED=0
   dpkg -l sed &>/dev/null && SED_INSTALLED=1
   CRON_INSTALLED=0
   dpkg -l cron &>/dev/null && CRON_INSTALLED=1
   GIT_INSTALLED=0
   dpkg -l git &>/dev/null && GIT_INSTALLED=1
-  if [[ $STDLIB_INSTALLED == 0 || $SED_INSTALLED == 0 || $CRON_INSTALLED == 0 || $GIT_INSTALLED == 0 ]]; then
+  if [[ $SED_INSTALLED == 0 || $CRON_INSTALLED == 0 || $GIT_INSTALLED == 0 ]]; then
     cout "Installing dependencies..."
     $SUDO apt-get update &>/dev/null
-  fi
-
-  if [[ $STDLIB_INSTALLED == 0 ]]; then
-    {
-      {
-        $SUDO apt-get install -y $STDLIB &>/dev/null
-      } || {
-        $SUDO apt-get install -y --no-install-recommends software-properties-common &>/dev/null
-        $SUDO add-apt-repository -y "ppa:ubuntu-toolchain-r/test" &>/dev/null
-        cwarn "Added 'ppa:ubuntu-toolchain-r/test' to apt sources!"
-        $SUDO apt-get install -y $STDLIB &>/dev/null
-      }
-      cwarn "Installed '$STDLIB' on system!"
-    } || {
-      cerr "Failed to install '$STDLIB' dependency!"
-      exit 65
-    }
   fi
 
   if [[ $SED_INSTALLED == 0 ]]; then

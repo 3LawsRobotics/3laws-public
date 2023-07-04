@@ -24,41 +24,32 @@ if [ "$HAS_ROS1" -eq 1 ]; then
     {
       topicsRos1=$(rostopic list)
 
-      echo "===========================" >>ros_network_info.txt
-      echo "========== ROS1 ===========" >>ros_network_info.txt
-      echo "===========================" >>ros_network_info.txt
+      echo "================================================================================" >>ros_network_info.txt
+      echo "===================================== ROS1 =====================================" >>ros_network_info.txt
+      echo "================================================================================" >>ros_network_info.txt
       echo "Ros version: ${ROS1_VERSION}" >>ros_network_info.txt
-      echo "======= TOPICS ========" >>ros_network_info.txt
-      echo >>ros_network_info.txt
+      echo -e "\n\n===================================  TOPICS  ===================================" >>ros_network_info.txt
       # Iterate through each topic
       for topic in $topicsRos1; do
         echo "exploring topic: $topic"
-        echo "Topic: $topic" >>ros_network_info.txt
-        echo "-----------------" >>ros_network_info.txt
+        echo -e "\nTopic: $topic" >>ros_network_info.txt
+        echo "----------------------------------------" >>ros_network_info.txt
 
         # Get the info for the current topic
         rostopic info "$topic" >>ros_network_info.txt
 
-        echo "=================" >>ros_network_info.txt
+        echo "========================================" >>ros_network_info.txt
       done
 
-      echo >>ros_network_info.txt
-      echo >>ros_network_info.txt
-      echo "======= NODES ========" >>ros_network_info.txt
-      echo >>ros_network_info.txt
+      echo -e "\n\n====================================  NODES  ===================================\n" >>ros_network_info.txt
       # Get the list of topics
       nodes=$(rosnode list)
 
       # Iterate through each topic
       for node in $nodes; do
         echo "exploring node: $node"
-        echo "Node: $node" >>ros_network_info.txt
-        echo "-----------------" >>ros_network_info.txt
-
         # Get the info for the current topic
         rosnode info "$node" >>ros_network_info.txt
-
-        echo "=================" >>ros_network_info.txt
       done
     } || {
       echo "Failed to discover ROS1 topics, passing to ROS2"
@@ -74,44 +65,36 @@ fi
 # Get the list of ros2 topics
 if [ "$HAS_ROS2" -eq 1 ]; then
   {
-
     topicsRos2=$(ros2 topic list) &>/dev/null
 
-    echo "===========================" >>ros_network_info.txt
-    echo "========== ROS2 ===========" >>ros_network_info.txt
-    echo "===========================" >>ros_network_info.txt
+    echo -e "\n\n\n================================================================================" >>ros_network_info.txt
+    echo "===================================== ROS2 =====================================" >>ros_network_info.txt
+    echo "================================================================================" >>ros_network_info.txt
     echo "Ros version: ${ROS2_VERSION}" >>ros_network_info.txt
-    echo "======= TOPICS ========" >>ros_network_info.txt
-    echo >>ros_network_info.txt
+    echo -e "\n\n===================================  TOPICS  ===================================\n" >>ros_network_info.txt
     # Iterate through each topic
     for topic in $topicsRos2; do
       echo "exploring topic: $topic"
-      echo "Topic: $topic" >>ros_network_info.txt
-      echo "-----------------" >>ros_network_info.txt
+      echo -e "\nTopic: $topic" >>ros_network_info.txt
+      echo "----------------------------------------" >>ros_network_info.txt
 
       # Get the info for the current topic
       ros2 topic info -v "$topic" >>ros_network_info.txt
 
-      echo "=================" >>ros_network_info.txt
+      echo "========================================" >>ros_network_info.txt
     done
 
-    echo >>ros_network_info.txt
-    echo >>ros_network_info.txt
-    echo "======= NODES ========" >>ros_network_info.txt
-    echo >>ros_network_info.txt
+    echo -e "\n\n====================================  NODES  ===================================" >>ros_network_info.txt
     # Get the list of topics
     nodes=$(ros2 node list)
 
     # Iterate through each topic
     for node in $nodes; do
       echo "exploring node: $node"
-      echo "Node: $node" >>ros_network_info.txt
-      echo "-----------------" >>ros_network_info.txt
+      echo -e "\n----------------------------------------" >>ros_network_info.txt
 
       # Get the info for the current topic
       ros2 node info "$node" >>ros_network_info.txt
-
-      echo "=================" >>ros_network_info.txt
     done
   } || {
     echo "Failed to discover ROS2 topics"

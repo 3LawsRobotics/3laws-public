@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-SCRIPT_VERSION="0.3.3"
+SCRIPT_VERSION="0.3.4"
 
 # Exit on errors
 set -e
@@ -112,7 +112,7 @@ remove_service() {
 }
 
 # Check if service is running
-remove_service 3laws_rdm_ros2.service
+remove_service 3laws_rdm_ros.service
 remove_service 3laws_rdm_docker.service
 
 # Remove cron jobs

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-SCRIPT_VERSION="0.5.5"
+SCRIPT_VERSION="0.5.6"
 
 # Exit on errors
 set -e
@@ -312,7 +312,7 @@ if [[ $INSTALL_MODE == "package" ]]; then
       {
         LLL_WS="$LAWS3_DIR/$PACKAGE_DIR"
         # Systemctl
-        SRVNAME=3laws_rdm_ros2.service
+        SRVNAME=3laws_rdm_ros.service
         cout "Installing daemon..."
         sed "s+@LLL_WS@+$LLL_WS+g; s+@ROS_DISTRO@+$ROS_DISTRO+g; s+@USERID@+$USERID+g; s+@GROUPID@+$GROUPID+g; s+@LAWS3_ROBOT_ID@+$ROBOT_ID+g;" "$LLL_WS/packages/$SRVNAME" \
           >"$LAWS3_DIR/$SRVNAME"

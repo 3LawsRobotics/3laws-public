@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-SCRIPT_VERSION="0.4.3"
+SCRIPT_VERSION="0.4.4"
 
 # Exit on errors
 set -e
@@ -90,7 +90,7 @@ if [[ $MODE == "PACKAGE" ]]; then
   # Check input arguments set
   SRVNAME=$9
   if [ -z "$SRVNAME" ]; then
-    SRVNAME=3laws_rdm_ros2.service
+    SRVNAME=3laws_rdm_ros.service
   fi
 
   ROS_DISTRO_LOCAL=${10}

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-SCRIPT_VERSION="0.5.7"
+SCRIPT_VERSION="0.5.8"
 
 # Exit on errors
 set -e
@@ -374,9 +374,9 @@ if [[ $INSTALL_MODE == "package" ]]; then
       echo -e "  source ~/.bashrc"
       cout "Add the following action to the LaunchDescription in your launch file:"
       echo -e "  <include file=\"\$(find lll_rdm)/launch/rdm.launch\">"
-      echo -e "    <arg name=\"log_level\" value=\"info\""
+      echo -e "    <arg name=\"log_level\" value=\"info\"/>"
       if [ -n "$ROBOT_ID" ]; then
-        echo -e "    <arg name=\"robot_id\" value=\"$ROBOT_ID\""
+        echo -e "    <arg name=\"robot_id\" value=\"$ROBOT_ID\"/>"
       fi
       echo -e "  </include>"
       echo -e " "

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-SCRIPT_VERSION="0.4.4"
+SCRIPT_VERSION="0.4.5"
 
 # Exit on errors
 set -e
@@ -19,7 +19,7 @@ ctitle() {
 }
 
 run_sudo() {
-  if [ -z "$SUDO" ]; then
+  if [ -n "$SUDO" ]; then
     runuser -l "$CURRENT_USER" -c "$1"
   else
     eval "$1"
@@ -108,7 +108,7 @@ if [[ $MODE == "PACKAGE" ]]; then
   # Check if git repo has been modified
   cd "$LAWS3_DIR/$PACKAGE_DIR"
 
-  ORIGINAL_BRANCH=$(run_sudo "git rev-parse --abbrev-ref HEAD")
+  ORIGINAL_BRANCH=$(run_sudo "cd \"$LAWS3_DIR/$PACKAGE_DIR\"; git rev-parse --abbrev-ref HEAD")
 
   if [[ $ORIGINAL_BRANCH == "HEAD" ]]; then
     echo "Currently on detached head. Aborting update..."
@@ -116,15 +116,15 @@ if [[ $MODE == "PACKAGE" ]]; then
   fi
 
   # Stash uncommited changes
-  UNCOMMITED_CHANGED=$(run_sudo "cd $LAWS3_DIR/$PACKAGE_DIR; git status --porcelain")
-  BRANCHED_OFF_CHANGES=$(run_sudo "cd $LAWS3_DIR/$PACKAGE_DIR; git merge-base --is-ancestor HEAD origin/$BRANCH || echo 1")
+  UNCOMMITED_CHANGED=$(run_sudo "cd \"$LAWS3_DIR/$PACKAGE_DIR\"; git status --porcelain")
+  BRANCHED_OFF_CHANGES=$(run_sudo "cd \"$LAWS3_DIR/$PACKAGE_DIR\"; git merge-base --is-ancestor HEAD origin/$BRANCH || echo 1")
   if [[ -n $UNCOMMITED_CHANGED ]]; then
     cout "Uncommited changes detected on repo, will stash changes for you and try to pop them after update..."
     run_sudo "git stash push"
   fi
 
   checkout_original() {
-    if ! run_sudo "git checkout $ORIGINAL_BRANCH"; then
+    if ! run_sudo "cd \"$LAWS3_DIR/$PACKAGE_DIR\"; git checkout $ORIGINAL_BRANCH"; then
       echo "git checkout of original branch '$ORIGINAL_BRANCH' failed."
       exit 131
     fi
@@ -133,7 +133,7 @@ if [[ $MODE == "PACKAGE" ]]; then
   pop_stash() {
     if [[ -n $UNCOMMITED_CHANGED ]]; then
       cout "Poping stash"
-      if ! run_sudo "git stash pop"; then
+      if ! run_sudo "cd \"$LAWS3_DIR/$PACKAGE_DIR\"; git stash pop"; then
         echo "Stash pop encountered conflicts"
         exit 131
       fi
@@ -141,14 +141,14 @@ if [[ $MODE == "PACKAGE" ]]; then
   }
 
   # Checkout master
-  if ! run_sudo "git checkout $BRANCH"; then
+  if ! run_sudo "cd \"$LAWS3_DIR/$PACKAGE_DIR\"; git checkout $BRANCH"; then
     echo "Failed to checkout master conflicts. Aborting update..."
     exit 131
   fi
 
   # Check if update available
-  run_sudo "cd $LAWS3_DIR/$PACKAGE_DIR; git fetch origin &> /dev/null"
-  UPDATE_AVAILABLE=$(run_sudo "cd $LAWS3_DIR/$PACKAGE_DIR; git diff --quiet HEAD origin/$BRANCH -- || echo 1")
+  run_sudo "cd \"$LAWS3_DIR/$PACKAGE_DIR\"; git fetch origin &> /dev/null"
+  UPDATE_AVAILABLE=$(run_sudo "cd \"$LAWS3_DIR/$PACKAGE_DIR\"; git diff --quiet HEAD origin/$BRANCH -- || echo 1")
   if [ -z "$UPDATE_AVAILABLE" ]; then
     cout "No update available."
     checkout_original
@@ -177,7 +177,7 @@ if [[ $MODE == "PACKAGE" ]]; then
   # Pull repo
   {
     cout "Pulling repo..."
-    run_sudo "cd $LAWS3_DIR/$PACKAGE_DIR; git pull &> /dev/null"
+    run_sudo "cd \"$LAWS3_DIR/$PACKAGE_DIR\"; git pull &> /dev/null"
   } || {
     cerr "Failed to update repo!"
     checkout_original
@@ -212,9 +212,9 @@ if [[ $MODE == "PACKAGE" ]]; then
   if [[ -n $BRANCHED_OFF_CHANGES ]]; then
     checkout_original
     cout "Changes not pushed detected on repo, will try to rebase for you..."
-    if ! run_sudo "git rebase origin/$BRANCH"; then
+    if ! run_sudo "cd \"$LAWS3_DIR/$PACKAGE_DIR\"; git rebase origin/$BRANCH"; then
       echo "Rebase encountered conflicts. Aborting update..."
-      run_sudo "git rebase --abort"
+      run_sudo "\"$LAWS3_DIR/$PACKAGE_DIR\"; git rebase --abort"
       exit 131
     fi
   fi

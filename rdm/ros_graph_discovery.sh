@@ -9,7 +9,7 @@ if command -v rosversion -d &>/dev/null; then
   HAS_ROS1=1
 fi
 HAS_ROS2=0
-if command -v ros2 topic list &>/dev/null; then
+if command -v ros2 &>/dev/null; then
   ROS2_VERSION="$ROS_DISTRO"
   HAS_ROS2=1
 fi

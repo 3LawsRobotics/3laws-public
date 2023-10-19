@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-SCRIPT_VERSION="0.6.0"
+SCRIPT_VERSION="0.6.1"
 
 # Exit on errors
 set -e
@@ -116,7 +116,7 @@ ALWAYS_YES=0
 START_MODE=""
 ROBOT_ID=""
 
-while getopts hy:s:r: opt; do
+while getopts hys:r: opt; do
   case $opt in
   h)
     show_help

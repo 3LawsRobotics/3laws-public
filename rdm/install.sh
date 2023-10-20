@@ -244,10 +244,8 @@ check_values() {
 
 # Script Options
 ALWAYS_YES=0
-START_MODE=""
-ROBOT_ID=""
 
-while getopts hyr: opt; do
+while getopts hy opt; do
   case $opt in
   h)
     show_help
@@ -255,9 +253,6 @@ while getopts hyr: opt; do
     ;;
   y)
     ALWAYS_YES=1
-    ;;
-  r)
-    ROBOT_ID="$OPTARG"
     ;;
   *)
     show_help >&2
@@ -267,27 +262,8 @@ while getopts hyr: opt; do
 done
 shift "$((OPTIND - 1))"
 
-# Check options consitancy
-if [[ -n $START_MODE && $START_MODE != "auto" && $START_MODE != "manual" ]]; then
-  cerr "option -s can only be used with either 'auto' or 'manual'"
-  exit 22
-fi
-
-# Define some variables
-LAWS3_DIR="/opt/3lawsRoboticsInc"
-SCRIPT_DIR="$LAWS3_DIR/scripts"
-USERID=$(id -u)
-GROUPID=$(id -g)
-BRANCH=new
-
 # Main
 ctitle "3Laws Robot Diagnostic Module Installer (v$SCRIPT_VERSION)"
-
-# Checking if root
-SUDO="sudo"
-if [[ "$(id -u)" == 0 ]]; then
-  SUDO=""
-fi
 
 HAS_ROS1=0
 if command -v roscore &>/dev/null; then
@@ -303,7 +279,7 @@ fi
 if [[ $HAS_ROS1 == 0 && $HAS_ROS2 == 0 ]]; then
   HAS_ROS1=1
   HAS_ROS2=1
-  USE_ROS2=$(promptYesNo() "ROS1 and ROS2 detected ! Do you want to use ROS2 as the RDM interface ?")
+  USE_ROS2=$(promptYesNo "ROS1 and ROS2 detected ! Do you want to use ROS2 as the RDM interface ?")
   if [[ $USE_ROS2 == 0 ]]; then
     cout "ROS1 will be used as RDM interface with distro $ROS1_DISTRO"
     QUERY_DISTRO=$ROS1_DISTRO

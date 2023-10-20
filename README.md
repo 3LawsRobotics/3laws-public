@@ -2,7 +2,7 @@
 
 ## Robot diagnostic module installation:
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/3LawsRobotics/3laws-public/beta/rdm/install.sh) [-h (help)] [-y (yes to all)] [-r <ROBOT_ID>]
+bash <(curl -fsSL https://raw.githubusercontent.com/3LawsRobotics/3laws-public/beta/rdm/install.sh) [-hyf] [-r <ROS_DISTRO>] [-a <ARCH>] [-v <UBUNTU_VERSION>]
 ```
 
 ## Robot diagnostic module uninstall:

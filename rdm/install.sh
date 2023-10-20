@@ -199,7 +199,7 @@ valid_args() {
 # Usage info
 show_help() {
   cat <<EOF
-Usage: ${0##*/} [-h] [-y] [-r <ROS_DISTRO>] [-a <ARCH>] [-v <UBUNTU_VERSION>]
+Usage: ${0##*/} [-hyf] [-r <ROS_DISTRO>] [-a <ARCH>] [-v <UBUNTU_VERSION>]
 Install 3Laws Robot Diagnostic Module
    -h                 show this help menu
    -y                 answer yes to all yes/no questions

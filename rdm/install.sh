@@ -284,46 +284,57 @@ shift "$((OPTIND - 1))"
 # Main
 ctitle "3Laws Robot Diagnostic Module Installer (v$SCRIPT_VERSION)"
 
-if [ $FORCE ] && [ -z $WANTED_ARCH ] || [ -z $WANTED_ROS ] || [ -z $WANTED_UBUNTU ]; then
+if [ $FORCE == 1 ] && [ -z $WANTED_ARCH ] || [ -z $WANTED_ROS ] || [ -z $WANTED_UBUNTU ]; then
   cerr "The force args requires all information to be provided"
   exit 1
 fi
 
-# Get system params if not force
+HAS_ROS1=0
+if command -v roscore &>/dev/null; then
+  HAS_ROS1=1
+  ROS1_DISTRO=$(rosversion -d)
+  QUERY_DISTRO=$ROS1_DISTRO
+fi
+HAS_ROS2=0
+if command -v ros2 &>/dev/null; then
+  HAS_ROS2=1
+  QUERY_DISTRO=$ROS_DISTRO
+fi
+
+UBUNTU_DISTRO=$(cat /etc/*-release | grep VERSION_ID | grep -oE "[0-9]{2}.[0-9]{2}")
+
+ARCH=amd64
+case "$(uname -i)" in
+arm* | aarch*)
+  ARCH=arm64
+  ;;
+esac
 
 if [ $FORCE == 0 ]; then
-
-  HAS_ROS1=0
-  if command -v roscore &>/dev/null; then
-    HAS_ROS1=1
-    ROS1_DISTRO=$(rosversion -d)
-    QUERY_DISTRO=$ROS1_DISTRO
-  fi
-  HAS_ROS2=0
-  if command -v ros2 &>/dev/null; then
-    HAS_ROS2=1
-    QUERY_DISTRO=$ROS_DISTRO
+  if [ -n "$WANTED_ROS" ]; then
+    if [ "$QUERY_DISTRO" != "$WANTED_ROS" ]; then
+      cwarn "Specified ROS version does not match the detected one, select your version:"
+      QUERY_DISTRO=$(promptChoiceROSDistro)
+    fi
   fi
 
-  UBUNTU_DISTRO=$(cat /etc/*-release | grep VERSION_ID | grep -oE "[0-9]{2}.[0-9]{2}")
-
-  ARCH=amd64
-  case "$(uname -i)" in
-  arm* | aarch*)
-    ARCH=arm64
-    ;;
-  esac
-
-  if [[ $HAS_ROS1 == "$HAS_ROS2" || $QUERY_DISTRO != "$WANTED_ROS" ]]; then
+  if [ $HAS_ROS1 == "$HAS_ROS2" ]; then
+    cwarn "Unable to select a ROS distribution, select your version:"
     QUERY_DISTRO=$(promptChoiceROSDistro)
   fi
 
-  if [[ $UBUNTU_DISTRO != "$WANTED_UBUNTU" ]]; then
-    UBUNTU_DISTRO=$(promptChoiceUbuntuDistro)
+  if [ -n "$WANTED_UBUNTU" ]; then
+    if [ "$UBUNTU_DISTRO" != "$WANTED_UBUNTU" ]; then
+      cwarn "Specified Ubuntu version does not match the detected one, select your version:"
+      UBUNTU_DISTRO=$(promptChoiceUbuntuDistro)
+    fi
   fi
 
-  if [[ $ARCH != "$WANTED_ARCH" ]]; then
-    ARCH=$(promptChoiceArch)
+  if [ -n "$WANTED_ARCH" ]; then
+    if [[ $ARCH != "$WANTED_ARCH" ]]; then
+      cwarn "Specified Architecture does not match the detected one, select your version:"
+      ARCH=$(promptChoiceArch)
+    fi
   fi
 
 else

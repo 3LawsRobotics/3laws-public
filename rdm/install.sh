@@ -286,6 +286,7 @@ ctitle "3Laws Robot Diagnostic Module Installer (v$SCRIPT_VERSION)"
 
 if [ $FORCE ] && [ -z $WANTED_ARCH ] || [ -z $WANTED_ROS ] || [ -z $WANTED_UBUNTU ]; then
   cerr "The force args requires all information to be provided"
+  exit 1
 fi
 
 # Get system params if not force

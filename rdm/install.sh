@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-SCRIPT_VERSION="0.7.0"
+SCRIPT_VERSION="0.8.0"
 
 # Exit on errors
 set -e
@@ -80,25 +80,13 @@ promptYesNo() {
   echo "$REPLY"
 }
 
-promptChoiceLaunch() {
-  local REPLY=""
-  select which in "Automatic" "Manual"; do
-    case $which in
-    "Automatic")
-      REPLY="auto"
-      break
-      ;;
-    "Manual")
-      REPLY="manual"
-      break
-      ;;
-    *) ;;
-    esac
-  done
-  echo "$REPLY"
-}
-
 promptChoiceArch() {
+  if [[ $ALWAYS_YES == 1 ]]; then
+    cerr "Always Yes selected but a multichoices question has been raised"
+    cerr "Use -f -r <ROS_DISTRO> -a <ARCH> -v <UBUNTU_VERSION> to force an install"
+    exit 1
+  fi
+
   local REPLY=""
   select which in "amd64" "arm64"; do
     case $which in
@@ -117,6 +105,11 @@ promptChoiceArch() {
 }
 
 promptChoiceUbuntuDistro() {
+  if [[ $ALWAYS_YES == 1 ]]; then
+    cerr "Always Yes selected but a multichoices question has been raised"
+    cerr "Use -f -r <ROS_DISTRO> -a <ARCH> -v <UBUNTU_VERSION> to force an install"
+    exit 1
+  fi
   local REPLY=""
   select which in "22.04" "20.04" "18.04"; do
     case $which in
@@ -139,6 +132,11 @@ promptChoiceUbuntuDistro() {
 }
 
 promptChoiceROSDistro() {
+  if [[ $ALWAYS_YES == 1 ]]; then
+    cerr "Always Yes selected but a multichoices question has been raised"
+    cerr "Use -f -r <ROS_DISTRO> -a <ARCH> -v <UBUNTU_VERSION> to force an install"
+    exit 1
+  fi
   local REPLY=""
   select which in "iron" "humble" "foxy" "galactic" "noetic" "melodic"; do
     case $which in
@@ -173,45 +171,41 @@ promptChoiceROSDistro() {
 }
 
 valid_args() {
-
   if [[ $UBUNTU_DISTRO == "22.04" ]]; then
     local valid_ros=("iron" "humble")
-
-    if [[ " ${valid_ros[@]} " =~ " ${QUERY_DISTRO} " ]]; then
-      echo "1"
-    else
-      echo "0"
-    fi
+    for value in "${valid_ros[@]}"; do
+      [[ $value == "$QUERY_DISTRO" ]] && return 1
+    done
+    return 0
   fi
+
   if [[ $UBUNTU_DISTRO == "20.04" ]]; then
     local valid_ros=("foxy" "noetic" "galactic")
-
-    if [[ " ${valid_ros[@]} " =~ " ${QUERY_DISTRO} " ]]; then
-      echo "1"
-    else
-      echo "0"
-    fi
+    for value in "${valid_ros[@]}"; do
+      [[ $value == "$QUERY_DISTRO" ]] && return 1
+    done
+    return 0
   fi
+
   if [[ $UBUNTU_DISTRO == "18.04" ]]; then
     local valid_ros=("melodic")
-
-    if [[ " ${valid_ros[@]} " =~ " ${QUERY_DISTRO} " ]]; then
-      echo "1"
-    else
-      echo "0"
-    fi
+    for value in "${valid_ros[@]}"; do
+      [[ $value == "$QUERY_DISTRO" ]] && return 1
+    done
+    return 0
   fi
 }
 
 # Usage info
 show_help() {
   cat <<EOF
-Usage: ${0##*/} [-h] [-y] [-s auto|manual] [-r <ROBOT_ID>] <COMPANY_ID>
+Usage: ${0##*/} [-hyf] [-r <ROS_DISTRO>] [-a <ARCH>] [-v <UBUNTU_VERSION>]
 Install 3Laws Robot Diagnostic Module
    -h                 show this help menu
    -y                 answer yes to all yes/no questions
-   -r <ROBOT_ID>      robot identified
-If -r is not specified, the robot name can be specified in the configuration file or using the variable ROBOT_ID
+   -r                 Optional: ROS distribution
+   -a                 CPU architecture (arm64v8|amd64)
+   -v                 Ubuntu version (22.04|20.04|18.04)
 EOF
 }
 
@@ -231,11 +225,20 @@ check_values() {
   fi
 
   if [[ $(valid_args) == 0 ]]; then
+    if [ $FORCE == 1 ]; then
+      cerr "ROS distro not compatible with your ubuntu distibution"
+      echo "22.04: iron | humble"
+      echo "20.04: noetic | galactic | foxy"
+      echo "18.04: melodic"
+      cout "Retry with other arguments"
+      exit 1
+    fi
     cerr "ROS distro not compatible with your ubuntu distibution"
     echo "22.04: iron | humble"
     echo "20.04: noetic | galactic | foxy"
     echo "18.04: melodic"
     cout "Specify iron|humble|foxy|galactic|noetic|melodic"
+
     QUERY_DISTRO=$(promptChoiceROSDistro)
   fi
 
@@ -244,8 +247,12 @@ check_values() {
 
 # Script Options
 ALWAYS_YES=0
+FORCE=0
+WANTED_ROS=""
+WANTED_ARCH=""
+WANTED_UBUNTU=""
 
-while getopts hy opt; do
+while getopts hyfr:a:v: opt; do
   case $opt in
   h)
     show_help
@@ -253,6 +260,18 @@ while getopts hy opt; do
     ;;
   y)
     ALWAYS_YES=1
+    ;;
+  f)
+    FORCE=1
+    ;;
+  r)
+    WANTED_ROS="$OPTARG"
+    ;;
+  a)
+    WANTED_ARCH="$OPTARG"
+    ;;
+  v)
+    WANTED_UBUNTU="$OPTARG"
     ;;
   *)
     show_help >&2
@@ -265,6 +284,11 @@ shift "$((OPTIND - 1))"
 # Main
 ctitle "3Laws Robot Diagnostic Module Installer (v$SCRIPT_VERSION)"
 
+if [ $FORCE == 1 ] && [ -z $WANTED_ARCH ] || [ -z $WANTED_ROS ] || [ -z $WANTED_UBUNTU ]; then
+  cerr "The force args requires all information to be provided"
+  exit 1
+fi
+
 HAS_ROS1=0
 if command -v roscore &>/dev/null; then
   HAS_ROS1=1
@@ -276,19 +300,6 @@ if command -v ros2 &>/dev/null; then
   HAS_ROS2=1
   QUERY_DISTRO=$ROS_DISTRO
 fi
-if [[ $HAS_ROS1 == 0 && $HAS_ROS2 == 0 ]]; then
-  HAS_ROS1=1
-  HAS_ROS2=1
-  USE_ROS2=$(promptYesNo "ROS1 and ROS2 detected ! Do you want to use ROS2 as the RDM interface ?")
-  if [[ $USE_ROS2 == 0 ]]; then
-    cout "ROS1 will be used as RDM interface with distro $ROS1_DISTRO"
-    QUERY_DISTRO=$ROS1_DISTRO
-  else
-    cout "ROS2 will be used as RDM interface with distro $ROS_DISTRO"
-    HAS_ROS1=0
-    QUERY_DISTRO=$ROS_DISTRO
-  fi
-fi
 
 UBUNTU_DISTRO=$(cat /etc/*-release | grep VERSION_ID | grep -oE "[0-9]{2}.[0-9]{2}")
 
@@ -298,6 +309,51 @@ arm* | aarch*)
   ARCH=arm64
   ;;
 esac
+
+if [ $FORCE == 0 ]; then
+  if [ -n "$WANTED_ROS" ]; then
+    if [ "$QUERY_DISTRO" != "$WANTED_ROS" ]; then
+      cwarn "Specified ROS version does not match the detected one, select your version:"
+      QUERY_DISTRO=$(promptChoiceROSDistro)
+    fi
+  fi
+
+  if [ $HAS_ROS1 == "$HAS_ROS2" ]; then
+    cwarn "Unable to select a ROS distribution, select your version:"
+    QUERY_DISTRO=$(promptChoiceROSDistro)
+  fi
+
+  if [ -n "$WANTED_UBUNTU" ]; then
+    if [ "$UBUNTU_DISTRO" != "$WANTED_UBUNTU" ]; then
+      cwarn "Specified Ubuntu version does not match the detected one, select your version:"
+      UBUNTU_DISTRO=$(promptChoiceUbuntuDistro)
+    fi
+  fi
+
+  if [ -n "$WANTED_ARCH" ]; then
+    if [[ $ARCH != "$WANTED_ARCH" ]]; then
+      cwarn "Specified Architecture does not match the detected one, select your version:"
+      ARCH=$(promptChoiceArch)
+    fi
+  fi
+
+else
+
+  if [[ $QUERY_DISTRO != "$WANTED_ROS" ]]; then
+    cwarn "Specified ROS version does not match the detected one, continue with $WANTED_ROS"
+    QUERY_DISTRO=$WANTED_ROS
+  fi
+
+  if [[ $UBUNTU_DISTRO != "$WANTED_UBUNTU" ]]; then
+    cwarn "Specified Ubuntu version does not match the detected one, continue with $WANTED_UBUNTU"
+    UBUNTU_DISTRO=$WANTED_UBUNTU
+  fi
+
+  if [[ $ARCH != "$WANTED_ARCH" ]]; then
+    cwarn "Specified Architecture does not match the detected one, continue with $WANTED_ARCH"
+    ARCH=$WANTED_ARCH
+  fi
+fi
 
 # Check args validity
 check_values
@@ -339,7 +395,48 @@ if [[ $DOWNLOAD == 1 ]]; then
   echo "Downloading package..." >&2
   curl $CURL_ARGS -s -H 'Accept: application/octet-stream' "$GH_ASSET"
   cout "Package $ASSET_NAME has been downloaded."
-  echo -e "To install it:\n\tsudo apt install -f ./$ASSET_NAME"
+
+  # Install dependencies
+  STDLIB=libstdc++-13-dev
+  STDLIB_INSTALLED=0
+  dpkg -l $STDLIB &>/dev/null && STDLIB_INSTALLED=1
+  SED_INSTALLED=0
+  dpkg -l sed &>/dev/null && SED_INSTALLED=1
+
+  if [[ $STDLIB_INSTALLED == 0 || $SED_INSTALLED == 0 ]]; then
+    cout "Installing dependencies..."
+    $SUDO apt-get update &>/dev/null
+  fi
+
+  if [[ $STDLIB_INSTALLED == 0 ]]; then
+    {
+      {
+        $SUDO apt-get install -y $STDLIB &>/dev/null
+      } || {
+        $SUDO apt-get install -y --no-install-recommends software-properties-common &>/dev/null
+        $SUDO add-apt-repository -y "ppa:ubuntu-toolchain-r/test" &>/dev/null
+        cwarn "Added 'ppa:ubuntu-toolchain-r/test' to apt sources!"
+        $SUDO apt-get install -y $STDLIB &>/dev/null
+      }
+      cwarn "Installed '$STDLIB' on system!"
+    } || {
+      cerr "Failed to install '$STDLIB' dependency!"
+      exit 65
+    }
+  fi
+
+  if [[ $SED_INSTALLED == 0 ]]; then
+    {
+      $SUDO apt-get install -y sed &>/dev/null
+      cwarn "Installed 'sed' on system!"
+    } || {
+      cerr "Failed to install 'sed' dependency!"
+      exit 65
+    }
+  fi
+
+  # Install package
+  sudo apt install -f ./"$ASSET_NAME"
   echo "Configuration files can be found at /opt/3lawsRobotics/config"
 else
   cwarn "Package not downloaded."

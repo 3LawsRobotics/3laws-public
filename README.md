@@ -2,18 +2,12 @@
 
 ## Robot diagnostic module installation:
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/3LawsRobotics/3laws-public/master/rdm/install.sh) [-h (help)] [-y (yes to all)] [-s auto|manual (start mode)] [-r <ROBOT_ID>] <COMPANY_ID>
-```
-If `-s` or `-r` are not specified, you will be prompted during the installation.
-
-## Robot diagnostic module update:
-```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/3LawsRobotics/3laws-public/master/rdm/update.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/3LawsRobotics/3laws-public/beta/rdm/install.sh) [-h (help)] [-y (yes to all)] [-r <ROBOT_ID>]
 ```
 
 ## Robot diagnostic module uninstall:
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/3LawsRobotics/3laws-public/master/rdm/uninstall.sh)
+sudo apt pruge lll-rdm-<ROS_DISTRO>
 ```
 
 ## Ros2 node and topic discovery script:

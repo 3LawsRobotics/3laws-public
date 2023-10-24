@@ -284,8 +284,13 @@ shift "$((OPTIND - 1))"
 # Main
 ctitle "3Laws Robot Diagnostic Module Installer (v$SCRIPT_VERSION)"
 
-if [ $FORCE == 1 ] && [ -z $WANTED_ARCH ] || [ -z $WANTED_ROS ] || [ -z $WANTED_UBUNTU ]; then
-  cerr "The force args requires all information to be provided"
+if [ "$FORCE" == 1 ] && { [ -z "$WANTED_ARCH" ] || [ -z "$WANTED_ROS" ] || [ -z "$WANTED_UBUNTU" ]; }; then
+  cerr "The force args require all information to be provided"
+  exit 1
+fi
+
+if [ "$EUID" -ne 0 ]; then
+  cerr "This script must be run as sudo or with superuser privileges."
   exit 1
 fi
 

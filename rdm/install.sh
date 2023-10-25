@@ -285,7 +285,7 @@ shift "$((OPTIND - 1))"
 ctitle "3Laws Robot Diagnostic Module Installer (v$SCRIPT_VERSION)"
 
 if [ "$FORCE" == 1 ] && { [ -z "$WANTED_ARCH" ] || [ -z "$WANTED_ROS" ] || [ -z "$WANTED_UBUNTU" ]; }; then
-  cerr "The force args require all information to be provided"
+  cerr "The force arg requires all information to be provided"
   exit 1
 fi
 
@@ -370,8 +370,6 @@ GH_API="https://api.github.com"
 GH_REPO="$GH_API/repos/3LawsRobotics/3laws"
 GH_TAGS="$GH_REPO/releases/latest"
 CURL_ARGS="-LJO#"
-# GITHUB_API_TOKEN=TOKEN
-# AUTH="Authorization: token $GITHUB_API_TOKEN"
 
 curl -o /dev/null -s $GH_REPO || {
   echo "Error: Invalid repo, token or network issue!"
@@ -395,12 +393,28 @@ ASSET_ID=$(echo "$RESPONSE" | grep -C3 "name.:.\+$REGEX_QUERY" | grep -w id | tr
 
 GH_ASSET="$GH_REPO/releases/assets/$ASSET_ID"
 
-DOWNLOAD=$(promptYesNo "Do you want to download $ASSET_NAME in the current directory" 1)
+DOWNLOAD=0
+if [ -f "$ASSET_NAME" ]; then
+  cwarn "$ASSET_NAME already in your directory."
+  OVERWRITE=$(promptYesNo "Do you want to overwrite $ASSET_NAME in the current directory ?" 1)
+  if [ "$OVERWRITE" -eq 1 ]; then
+    cwarn "Removing $ASSET_NAME"
+    rm "$ASSET_NAME"
+    DOWNLOAD=1
+  fi
+else
+  DOWNLOAD=$(promptYesNo "Do you want to download $ASSET_NAME in the current directory" 1)
+fi
+
 if [[ $DOWNLOAD == 1 ]]; then
   echo "Downloading package..." >&2
   curl $CURL_ARGS -s -H 'Accept: application/octet-stream' "$GH_ASSET"
   cout "Package $ASSET_NAME has been downloaded."
+else
+  cwarn "Package not downloaded."
+fi
 
+if [ -f "$ASSET_NAME" ]; then
   # Install dependencies
   STDLIB=libstdc++-13-dev
   STDLIB_INSTALLED=0
@@ -442,8 +456,7 @@ if [[ $DOWNLOAD == 1 ]]; then
 
   # Install package
   sudo apt install -f ./"$ASSET_NAME"
-  echo "Configuration files can be found at /opt/3lawsRobotics/config"
+  cout "Success installation!"
 else
-  cwarn "Package not downloaded."
-  cout "If you encounter any issues, please contact: support@3lawsrobotics.com"
+  cout "Package not found...If you encounter any issues, please contact: support@3lawsrobotics.com"
 fi
